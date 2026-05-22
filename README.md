@@ -29,12 +29,12 @@ ts-forecasting-benchmark/
 | :---- | :---- | :---- |
 | **models\_config.json** | 設定 | 手法選定チェックボックスの項目、中分類、グラフ線カラー、論文OWA値、説明文を完全に一括管理するマスター設定ファイル。 Comb 1〜6のブレンド生成ルール（抽出戦略）もここに外部定義。 |
 | **manual.json** | 設定 | 画面右上のボタンから閲覧できるヘルプ用ユーザーマニュアルの構造化テキストファイル。機能が追加されてもプログラムを修正せずマニュアルを改訂可能。 |
-| **preprocessing.py** | 前処理 | 時系列データに不可欠な、前方/後方/平均による欠損値補完（Imputation）や、機械学習の適合精度を最大化するZ-Score標準化スケーラー（fit/transform/inverse\_transform）の実装。 |
-| **feature\_engineering.py** | ラグ特徴量 | 1次元時系列データ配列から、過去 of ラグ（Sliding Window幅）を自動算出して教師あり学習用の特徴量行列 ![][image1] とターゲット配列 ![][image2] を生成する。 |
-| **evaluation\_metrics.py** | 評価指標 | 評価誤差の計算を行います。M4競争基準である **SMAPE**（対称平均絶対パーセント誤差）および **MASE**（平均絶対スケーリング誤差）、MASE計算用の学習データベースライン分母（sp対応）の数理計算。 |
-| **ranking\_system.py** | 評価集計 | 各個別系列で計算されたSMAPEとMASEを集約し、ベースラインモデル（Naive 2）の相対性能比としての **OWA（総合加重平均スコア）** を全モデル分算出してランキング。 |
-| **statistical\_models.py** | モデル | 伝統的な時系列モデルの実学習および予測。sktime や prophet と連携。未インストール時は自前のモックシミュレータに安全フォールバック。 |
-| **machine\_learning\_models.py** | モデル | 機械学習および PyTorchベースのディープラーニング（RNN/DeepAR）モデルを内包。make\_reductionを使用せず、自作の「再帰的予測ループ（Recursive Multi-step Forecasting）」を回すことで、将来値を1期ずつ再帰推論。 |
+| **preprocessing.py** | データ前処理 | 時系列データに不可欠な、前方/後方/平均による欠損値補完（Imputation）や、機械学習の適合精度を最大化するZ-Score標準化スケーラー（fit/transform/inverse\_transform）の実装。 |
+| **feature\_engineering.py** | 特徴量作成 | 1次元時系列データ配列から、過去 of ラグ（Sliding Window幅）を自動算出して教師あり学習用の特徴量行列 ![][image1] とターゲット配列 ![][image2] を生成する。 |
+| **evaluation\_metrics.py** | 評価指標選択 | 評価誤差の計算を行います。M4競争基準である **SMAPE**（対称平均絶対パーセント誤差）および **MASE**（平均絶対スケーリング誤差）、MASE計算用の学習データベースライン分母（sp対応）の数理計算。 |
+| **ranking\_system.py** | ランキング | 各個別系列で計算されたSMAPEとMASEを集約し、ベースラインモデル（Naive 2）の相対性能比としての **OWA（総合加重平均スコア）** を全モデル分算出してランキング。 |
+| **statistical\_models.py** | 予測手法選択（統計モデル） | 伝統的な時系列モデルの実学習および予測。sktime や prophet と連携。未インストール時は自前のモックシミュレータに安全フォールバック。 |
+| **machine\_learning\_models.py** | 予測手法選択（機械学習モデル） | 機械学習および PyTorchベースのディープラーニング（RNN/DeepAR）モデルを内包。make\_reductionを使用せず、自作の「再帰的予測ループ（Recursive Multi-step Forecasting）」を回すことで、将来値を1期ずつ再帰推論。 |
 | **main.py** | API | FastAPIのAPIルーター。クレンジング後のデータを各予測器へ供給し、結果を受け取って models\_config.json 内の定義規則に基づいて Comb 1〜Comb 6 の動的ブレンド予測値平均を算出。ランキングを集計してフロントへ配信。 |
 | **test\_driver.py** | テスト | FastAPIサーバー起動状態で実行するAPI自動検証・バッチテストスクリプト。設定値JSONをインポートしてAPI推論をかけ、結果スコア・予測系列の双方をCSVに出力。 |
 | **test\_input\_template.json** | テスト | test\_driver.py がインポートする、フロントエンド側の各種マッピングパラメータ、予測期間、入力時系列データ、及び評価対象アルゴリズムを記述したテンプレートJSON。 |
