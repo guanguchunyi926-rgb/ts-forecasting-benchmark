@@ -1,0 +1,1618 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>時系列予測モデル ベンチマーク</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js と、ズーム機能に必要な Hammer.js、ZoomプラグインのCDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+  <style>
+    /* チェックボックスのカスタムカラー */
+    .checkbox-custom {
+      appearance: none;
+      width: 1.25rem;
+      height: 1.25rem;
+      border: 2px solid #D1D5DB;
+      border-radius: 0.25rem;
+      cursor: pointer;
+      position: relative;
+    }
+    .checkbox-custom:checked::after {
+      content: '✔';
+      position: absolute;
+      color: white;
+      font-size: 0.85rem;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+    /* ローディングアニメーション */
+    .loader {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #4F46E5;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    /* テーブル行ホバー */
+    .hover-row { transition: background-color 0.2s ease; cursor: pointer; }
+    /* カスタムスクロールバー */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f1f1;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #c1c1c1;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #a8a8a8;
+    }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans h-screen flex flex-col overflow-hidden">
+  
+  <!-- ヘッダー -->
+  <header class="bg-indigo-900 text-white p-4 shadow z-10 flex justify-between items-center">
+    <div class="flex items-center space-x-2">
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path>
+      </svg>
+      <h1 class="text-xl font-bold">複数系列対応 予測ベンチマークシステム</h1>
+    </div>
+    <div class="flex items-center space-x-4">
+      <!-- API接続設定 -->
+      <div class="bg-indigo-950 p-1.5 rounded-lg border border-indigo-700/50 flex items-center space-x-2 text-xs">
+        <span class="text-indigo-300 font-medium ml-1">API連携:</span>
+        <select id="apiConnectionMode" onchange="toggleApiMode()" class="bg-indigo-900 border-none rounded text-white px-2 py-1 font-bold outline-none cursor-pointer">
+          <option value="mock">ローカル模擬予測</option>
+          <option value="api">FastAPIサーバー</option>
+        </select>
+        <input type="text" id="apiEndpoint" value="http://localhost:8000/api/evaluate" placeholder="APIエンドポイント" 
+               class="bg-indigo-900 border-none rounded text-white px-2 py-1 text-[11px] w-52 hidden outline-none focus:ring-1 focus:ring-indigo-400">
+      </div>
+      <!-- ★マニュアル表示ボタンの新設 -->
+      <button onclick="openManualModal()" class="flex items-center space-x-1 bg-indigo-700 hover:bg-indigo-600 border border-indigo-500 rounded px-2.5 py-1 text-xs font-bold transition active:scale-95">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+        </svg>
+        <span>📖 マニュアル</span>
+      </button>
+      <span class="text-xs bg-indigo-800 px-2 py-1 rounded">ver 7.1</span>
+    </div>
+  </header>
+
+  <!-- ステップインジケーター -->
+  <div class="bg-white border-b shadow-sm">
+    <div class="max-w-7xl mx-auto px-6 py-3.5 flex items-center justify-between">
+      <div class="flex items-center space-x-3" id="step1-indicator">
+        <div class="w-7 h-7 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-sm">1</div>
+        <span class="font-bold text-indigo-900 text-sm">データの準備・モデル選択</span>
+      </div>
+      <div class="flex-1 border-t-2 border-gray-200 mx-4" id="step-line"></div>
+      <div class="flex items-center space-x-3 opacity-50" id="step2-indicator">
+        <div class="w-7 h-7 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center font-bold text-sm">2</div>
+        <span class="font-bold text-gray-500 text-sm">ベンチマーク評価</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- コンテンツエリア -->
+  <div class="flex-1 overflow-y-auto p-6 relative">
+    
+    <!-- ==========================================
+         STEP 1: データ準備・構築画面
+         ========================================== -->
+    <main id="view-setup" class="max-w-7xl mx-auto block">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <!-- 左カラム: データ設定・アップロード -->
+        <div class="lg:col-span-5 bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex flex-col justify-between">
+          <div>
+            <h2 class="text-lg font-bold text-gray-800 mb-3 flex items-center">
+              <svg class="w-5 h-5 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+              </svg>
+              データ設定とアップロード
+            </h2>
+            <p class="text-xs text-gray-500 mb-4 leading-relaxed">
+              縦持ち形式（系列名、時間、実績、既存予測など）のCSVファイルをアップロードできます。時間軸はマッピング機能に基づいて自動解析されます。
+            </p>
+
+            <!-- 基本設定 -->
+            <div class="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-4">
+              <div class="grid grid-cols-2 gap-4 mb-3">
+                <div>
+                  <label class="block text-xs font-semibold text-gray-700 mb-1">評価（予測）期間</label>
+                  <div class="flex items-center">
+                    <input type="number" id="settingHorizon" value="12" min="1" class="w-full border border-gray-300 rounded-l px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-indigo-500">
+                    <span class="bg-gray-200 text-gray-600 border border-l-0 border-gray-300 rounded-r px-2 py-1.5 text-sm font-medium">期</span>
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-gray-700 mb-1">データの粒度（sp調整）</label>
+                  <select id="settingFreq" class="w-full border border-gray-300 rounded px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-indigo-500">
+                    <option value="M">月次 (Monthly - sp:12)</option>
+                    <option value="W">週次 (Weekly - sp:52)</option>
+                    <option value="D">日次 (Daily - sp:7)</option>
+                    <option value="Q">四半期 (Quarterly - sp:4)</option>
+                    <option value="Y">年次 (Yearly - sp:1)</option>
+                  </select>
+                </div>
+              </div>
+              
+              <!-- カラムマッピング -->
+              <div class="border-t border-gray-200 pt-3 mt-3">
+                <span class="block text-xs font-bold text-gray-700 mb-2">CSVカラムマッピング設定</span>
+                <div class="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <span class="text-[11px] text-gray-500">系列（Series）列名</span>
+                    <input type="text" id="colSeries" value="series" class="w-full border border-gray-300 rounded px-2.5 py-1 outline-none">
+                  </div>
+                  <div>
+                    <span class="text-[11px] text-gray-500">時間（Time）列名</span>
+                    <input type="text" id="colTime" value="date" class="w-full border border-gray-300 rounded px-2.5 py-1 outline-none">
+                  </div>
+                  <div>
+                    <span class="text-[11px] text-gray-500">実績（Actual）列名</span>
+                    <input type="text" id="colActual" value="actual" class="w-full border border-gray-300 rounded px-2.5 py-1 outline-none">
+                  </div>
+                  <div>
+                    <span class="text-[11px] text-gray-500">社内予測（Forecast）列名</span>
+                    <input type="text" id="colForecast" value="forecast" class="w-full border border-gray-300 rounded px-2.5 py-1 outline-none">
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- ドラッグエリア -->
+            <input type="file" id="csvFileInput" accept=".csv" class="hidden" onchange="handleFileUpload(event)">
+            <div onclick="document.getElementById('csvFileInput').click()" class="border-2 border-dashed border-gray-300 bg-white rounded-xl p-5 text-center cursor-pointer hover:bg-indigo-50/50 hover:border-indigo-400 transition mb-4 group">
+              <svg class="mx-auto h-7 w-7 text-gray-400 group-hover:text-indigo-500 mb-1.5 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+              </svg>
+              <p class="text-xs font-semibold text-gray-600 group-hover:text-indigo-700">クリックまたはCSVファイルをドロップ</p>
+            </div>
+          </div>
+
+          <!-- 現在のステータス表示 -->
+          <div class="bg-blue-50 border border-blue-100 p-3.5 rounded-lg flex items-center justify-between">
+            <div class="min-w-0">
+              <p class="text-xs font-bold text-blue-900 truncate" id="dataStatusTitle">検証用の擬似時系列データを使用中</p>
+              <p class="text-[11px] text-blue-700 mt-0.5 truncate" id="dataStatusDesc">データ: 5系列 × 72期 (学習:60期 / 予測:12期)</p>
+            </div>
+            <button onclick="regenerateData()" class="text-[11px] text-blue-600 hover:text-blue-800 font-bold bg-white px-2.5 py-1 rounded border border-blue-200 shrink-0 shadow-sm transition active:scale-95">
+              再生成
+            </button>
+          </div>
+        </div>
+
+        <!-- 右カラム: モデル構築設定 -->
+        <div class="lg:col-span-7 bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center mb-1">
+              <h2 class="text-lg font-bold text-gray-800 flex items-center">
+                <svg class="w-5 h-5 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 003.86.517l2.389.478a2 2 0 011.022.547l.978.978a2 2 0 01-.547 2.879l-2.387.478a6 6 0 01-3.86-.517l-2.389-.478a2 2 0 00-1.022-.547z"></path>
+                </svg>
+                検証対象アルゴリズムの選定
+              </h2>
+              <div class="space-x-2 text-xs">
+                <button onclick="selectModels('m4')" class="text-indigo-600 hover:text-indigo-800 font-semibold">🏆 M4主要</button>
+                <button onclick="selectModels('all')" class="text-indigo-600 hover:text-indigo-800 font-semibold">全選択</button>
+                <button onclick="selectModels('clear')" class="text-gray-500 hover:text-gray-800 font-semibold">クリア</button>
+              </div>
+            </div>
+            <p class="text-xs text-gray-500 mb-4">バックエンドAPIで学習・推論を実行させるアルゴリズム群を選択してください。</p>
+
+            <!-- アコーディオン型カテゴリー選択UI -->
+            <div class="space-y-3 max-h-[355px] overflow-y-auto pr-1" id="accordionContainer">
+              <!-- models_config.json の定義をロードして動的に完全生成します -->
+            </div>
+          </div>
+
+          <button onclick="submitToBackend()" class="w-full bg-indigo-600 text-white font-bold text-md py-3 px-4 rounded-xl hover:bg-indigo-700 shadow-lg transform active:scale-[0.98] transition flex justify-center items-center mt-3">
+            <span id="btnSubmitText">ベンチマーク評価を実行</span>
+            <svg class="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+            </svg>
+          </button>
+        </div>
+
+      </div>
+    </main>
+
+    <!-- ==========================================
+         ローディング画面
+         ========================================== -->
+    <div id="view-loading" class="hidden absolute inset-0 bg-white/95 backdrop-blur-sm z-20 flex flex-col items-center justify-center">
+      <div class="loader mb-4"></div>
+      <h3 class="text-lg font-bold text-indigo-900 mb-1" id="loadingTitle">バックエンド処理を実行中...</h3>
+      <p class="text-xs text-gray-500" id="loading-text">系列データを解析し、アルゴリズムモデルのフィッティングを行っています</p>
+      <div class="w-64 bg-gray-200 rounded-full h-2 mt-4 overflow-hidden">
+        <div class="bg-indigo-600 h-2 rounded-full transition-all duration-300" id="loading-bar" style="width: 0%"></div>
+      </div>
+    </div>
+
+    <!-- ==========================================
+         STEP 2: ベンチマーク・予測結果画面
+         ========================================== -->
+    <main id="view-results" class="max-w-7xl mx-auto hidden">
+      
+      <!-- ヘッダーアクション -->
+      <div class="flex justify-between items-center mb-4">
+        <button onclick="backToSetup()" class="flex items-center text-xs font-bold text-gray-600 hover:text-indigo-600 transition">
+          <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+          モデル選択に戻る
+        </button>
+        <span id="eval-mode-badge" class="bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full text-[11px] font-bold border border-indigo-200">
+          OWA加重精度算出結果
+        </span>
+      </div>
+      
+      <!-- 評価コメントカード -->
+      <div class="bg-white border-l-4 border-indigo-600 rounded-r-lg shadow-sm p-4 mb-5 flex items-start">
+        <div class="flex-shrink-0 mr-3 mt-0.5">
+          <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+        </div>
+        <div>
+          <h3 class="font-bold text-sm text-gray-800">全系列 総合パフォーマンス総括分析</h3>
+          <p id="evaluation-comment" class="text-xs text-gray-600 mt-1 leading-relaxed">
+            モデルの総合評価を計算しています...
+          </p>
+        </div>
+      </div>
+      
+      <!-- グラフとテーブル -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <!-- 左: グラフエリア (ズームコントロール搭載) -->
+        <div class="lg:col-span-7 bg-white rounded-xl shadow-sm p-4 border border-gray-200 flex flex-col justify-between">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-3 bg-gray-50 p-2 rounded-lg border">
+            <!-- 系列セレクタ -->
+            <div class="flex items-center space-x-2">
+              <span class="text-xs font-bold text-gray-700">対象系列:</span>
+              <select id="seriesSelector" onchange="changeChartSeries()" class="text-xs border border-gray-300 text-indigo-700 font-bold rounded px-2 py-1 bg-white outline-none cursor-pointer focus:ring-1 focus:ring-indigo-500">
+                <!-- 系列数に応じて動的に挿入 -->
+              </select>
+            </div>
+            
+            <!-- 拡大・縮小・リセット ズームツールバー -->
+            <div class="flex items-center space-x-1 bg-white p-1 border border-gray-200 rounded-md shadow-sm">
+              <button onclick="zoomChart(1.1)" title="拡大" class="p-1.5 text-gray-600 hover:text-indigo-600 hover:bg-gray-100 rounded-md transition active:scale-95" style="border: 1px solid transparent;">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7"></path>
+                </svg>
+              </button>
+              <button onclick="zoomChart(0.9)" title="縮小" class="p-1.5 text-gray-600 hover:text-indigo-600 hover:bg-gray-100 rounded-md transition active:scale-95" style="border: 1px solid transparent;">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7"></path>
+                </svg>
+              </button>
+              <button onclick="resetZoomChart()" title="表示のリセット" class="text-xs font-bold text-gray-500 hover:text-indigo-600 hover:bg-gray-100 px-2.5 py-1 rounded-md border border-gray-200 transition active:scale-95">
+                ズーム初期化
+              </button>
+            </div>
+            
+            <span class="text-[10px] text-gray-400 hidden xl:inline">※グラフをドラッグで移動、ホイールスクロールで伸縮</span>
+          </div>
+          <div class="relative flex-1" style="min-height: 400px; height: 350px;">
+            <canvas id="forecastChart"></canvas>
+          </div>
+          
+          <!-- グラフの下の動的ホバー値バッジパネル -->
+          <div id="hoverInfoPanel" class="mt-4 bg-gray-50 border border-gray-200 rounded-xl p-3.5 text-xs min-h-[96px] flex flex-col justify-center text-gray-500 transition-all duration-200 shadow-inner">
+            <div class="text-center">
+              <svg class="w-6 h-6 mx-auto text-gray-400 mb-1.5 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"></path>
+              </svg>
+              <p class="font-medium text-gray-500">グラフの上にマウスをホバー、または<span class="font-bold text-indigo-600 text-xs">グラフ上を直接クリック</span>すると数値をロックしてゆっくりスクロール比較できます。</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 右: ベンチマークテーブル -->
+        <div class="lg:col-span-5 bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col overflow-hidden">
+          <div class="px-4 py-3 bg-gray-50 border-b">
+            <h3 class="text-sm font-bold text-gray-700">全系列 総合スコア一覧（OWA順）</h3>
+            <p class="text-[10px] text-gray-500 mt-0.5">評価基準: ナイーブモデル2 (Naive 2) に対する相対評価比</p>
+          </div>
+          <div class="flex-1 overflow-y-auto scroll-area" style="max-height: 480px;">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50 sticky top-0 z-10">
+                <tr>
+                  <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                    <div class="flex items-center justify-between">
+                      <span>モデル (表示選択)</span>
+                      <!-- 一括制御用スイッチ -->
+                      <div class="space-x-1.5 shrink-0 text-[9px] font-normal text-indigo-600 lowercase select-none">
+                        <button onclick="toggleAllTableModels(true); event.stopPropagation();" class="hover:underline hover:text-indigo-800 font-bold">全表示</button>
+                        <span class="text-gray-300">|</span>
+                        <button onclick="toggleAllTableModels(false); event.stopPropagation();" class="hover:underline hover:text-indigo-800 font-bold">全隠す</button>
+                      </div>
+                    </div>
+                  </th>
+                  <th class="px-2 py-2.5 text-right text-[10px] font-bold text-gray-500 uppercase tracking-wider">SMAPE</th>
+                  <th class="px-2 py-2.5 text-right text-[10px] font-bold text-gray-500 uppercase tracking-wider">MASE</th>
+                  <th class="px-3 py-2.5 text-right text-[10px] font-bold text-indigo-600 bg-indigo-50/50 uppercase tracking-wider">OWA</th>
+                </tr>
+              </thead>
+              <tbody id="benchmarkTableBody" class="bg-white divide-y divide-gray-200 text-xs">
+                <!-- JSで生成 -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+  </div>
+
+  <!-- ★ ユーザーマニュアル表示用モーダル（Tailwindベースの動的ロードモーダル） -->
+  <div id="manualModal" class="hidden fixed inset-0 z-50 overflow-hidden flex items-center justify-center bg-black/60 backdrop-blur-sm transition-opacity duration-300">
+    <div class="bg-white rounded-2xl w-full max-w-4xl h-[85vh] flex flex-col shadow-2xl mx-4 transform transition-all duration-300 scale-95" id="manualModalContent">
+      <!-- モーダルヘッダー -->
+      <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-indigo-900 text-white rounded-t-2xl">
+        <div class="flex items-center space-x-2">
+          <svg class="w-5 h-5 text-indigo-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+          </svg>
+          <h2 class="text-base font-bold" id="manualTitle">ユーザーマニュアル</h2>
+        </div>
+        <button onclick="closeManualModal()" class="text-gray-200 hover:text-white bg-indigo-800 hover:bg-indigo-700 px-3 py-1 rounded-md text-xs font-bold transition">
+          ✕ 閉じる
+        </button>
+      </div>
+      <!-- モーダルボディ（スクロール領域） -->
+      <div class="flex-1 overflow-y-auto px-8 py-6 space-y-6 text-sm leading-relaxed scroll-area" id="manualBody">
+        <div class="text-center py-12">
+          <div class="loader mx-auto mb-4"></div>
+          <p class="text-gray-500 font-medium">マニュアルデータを非同期ロード中...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ==========================================
+    // オフライン・フォールバック用の手法メタ定義オブジェクト
+    // models_config.json の配給がない場合に自動的に機能します
+    // ==========================================
+    let activeConfig = {
+      "categories": {
+        "statistical": "📈 統計時系列モデル (Classical Statistical)",
+        "ml": "🤖 機械学習・ラグ回帰 & 深層学習 (ML/DL Regressors)",
+        "ensemble": "🧬 ハイブリッド・アンサンブルモデル"
+      },
+      "subcategories": {
+        "naive": "ナイーブ", "smoothing": "指数平滑", "arima_grp": "ARIMA", "state_space": "状態空間モデル",
+        "linear_reg": "線形回帰", "tree": "決定木", "svm_grp": "SVM", "nn": "ニューラルネットワーク"
+      },
+      "subcat_groups": {
+        "naive": ["naive2", "naive1", "naive_s"],
+        "smoothing": ["ses", "holt", "damped", "theta", "ets", "tbats"],
+        "arima_grp": ["arma", "arima", "sarima", "autoarima"],
+        "state_space": ["prophet"],
+        "linear_reg": ["linear", "ridge", "lasso", "elasticnet", "gam"],
+        "tree": ["dt", "rf", "gbdt", "xgb", "lgbm"],
+        "svm_grp": ["svm"],
+        "nn": ["mlp", "rnn", "deepar"]
+      },
+      "models": [
+        { "id": "naive2", "name": "Naive 2 (ベースライン)", "category": "statistical", "subcat": "naive", "color": "#4B5563", "paperOwa": 1.000, "isM4": true, "desc": "Naive 1と同様であるが、必要に応じて季節調整。" },
+        { "id": "naive1", "name": "Naive 1", "category": "statistical", "subcat": "naive", "color": "#6B7280", "paperOwa": 1.000, "isM4": true, "desc": "将来の値が最後の観測値と同じと仮定。" },
+        { "id": "naive_s", "name": "Naive S", "category": "statistical", "subcat": "naive", "color": "#9CA3AF", "paperOwa": 1.000, "isM4": true, "desc": "前年同期の最後の観測値と同じと仮定。" },
+        { "id": "ses", "name": "SES (単純指数平滑)", "category": "statistical", "subcat": "smoothing", "color": "#0369A1", "paperOwa": 0.954, "isM4": true, "desc": "データを指数平滑、トレンドなしとして外挿。" },
+        { "id": "holt", "name": "Holt (線形トレンド)", "category": "statistical", "subcat": "smoothing", "color": "#0891B2", "paperOwa": 0.954, "isM4": true, "desc": "データを指数平滑、線形トレンドを仮定して外挿。" },
+        { "id": "damped", "name": "Damped (減衰トレンド)", "category": "statistical", "subcat": "smoothing", "color": "#0D9488", "paperOwa": 0.954, "isM4": true, "desc": "データを指数平滑、減衰トレンドを仮定して外挿。" },
+        { "id": "theta", "name": "Theta法", "category": "statistical", "subcat": "smoothing", "color": "#059669", "paperOwa": 0.954, "isM4": true, "desc": "ドリフトを伴う単純指数平滑化。" },
+        { "id": "ets", "name": "AutoETS", "category": "statistical", "subcat": "smoothing", "color": "#0EA5E9", "paperOwa": 0.929, "isM4": true, "desc": "最適なパラメータをAIC等で自動推定。" },
+        { "id": "tbats", "name": "TBATS", "category": "statistical", "subcat": "smoothing", "color": "#3B82F6", "paperOwa": 0.928, "isM4": false, "desc": "Box-Cox 変換による指数平滑状態空間。" },
+        { "id": "arma", "name": "ARMA", "category": "statistical", "subcat": "arima_grp", "color": "#1E3A8A", "paperOwa": 1.207, "isM4": false, "desc": "自己回帰移動平均モデル。" },
+        { "id": "arima", "name": "ARIMA", "category": "statistical", "subcat": "arima_grp", "color": "#1D4ED8", "paperOwa": 0.993, "isM4": false, "desc": "標準的なハイパーパラメータ(1,1,1)を適用したARIMA。" },
+        { "id": "sarima", "name": "SARIMA", "category": "statistical", "subcat": "arima_grp", "color": "#2563EB", "paperOwa": 0.965, "isM4": false, "desc": "明示的な季節周期を組み込んだ季節ARIMA。" },
+        { "id": "autoarima", "name": "AutoARIMA", "category": "statistical", "subcat": "arima_grp", "color": "#3B82F6", "paperOwa": 0.948, "isM4": true, "desc": "ARIMA/SARIMAの最適次数を自動ステップワイズ探索。" },
+        { "id": "prophet", "name": "Prophet", "category": "statistical", "subcat": "state_space", "color": "#06B6D4", "paperOwa": 0.940, "isM4": false, "desc": "トレンド、年・週周期、祝日効果などを分解考慮する状態空間。" },
+        { "id": "linear", "name": "Linear", "category": "ml", "subcat": "linear_reg", "color": "#34D399", "paperOwa": 1.060, "isM4": false, "desc": "多変量線形回帰。過去のラグに対するフィッティング。" },
+        { "id": "ridge", "name": "Ridge", "category": "ml", "subcat": "linear_reg", "color": "#10B981", "paperOwa": 1.404, "isM4": false, "desc": "L2正則化を加えた線形自己回帰。" },
+        { "id": "lasso", "name": "Lasso", "category": "ml", "subcat": "linear_reg", "color": "#059669", "paperOwa": 1.350, "isM4": false, "desc": "L1正則化を加えた線形自己回帰。" },
+        { "id": "elasticnet", "name": "Elastic-Net", "category": "ml", "subcat": "linear_reg", "color": "#047857", "paperOwa": 1.317, "isM4": false, "desc": "L1及びL2正則化を併用した線形自己回帰。" },
+        { "id": "gam", "name": "GAM", "category": "ml", "subcat": "linear_reg", "color": "#6EE7B7", "paperOwa": 1.092, "isM4": false, "desc": "非線形スプライン関係を取り入れた一般化加法モデル。" },
+        { "id": "dt", "name": "Decision Tree", "category": "ml", "subcat": "tree", "color": "#84CC16", "paperOwa": 1.230, "isM4": false, "desc": "データから決定木を作成。" },
+        { "id": "rf", "name": "Random Forest", "category": "ml", "subcat": "tree", "color": "#15803D", "paperOwa": 0.955, "isM4": false, "desc": "弱学習決定木群を用いた決定木アンサンブル。" },
+        { "id": "gbdt", "name": "GBDT", "category": "ml", "subcat": "tree", "color": "#F59E0B", "paperOwa": 1.025, "isM4": false, "desc": "逐次残差適合決定木による勾配ブースティング。" },
+        { "id": "xgb", "name": "XGBoost", "category": "ml", "subcat": "tree", "color": "#D97706", "paperOwa": 1.075, "isM4": false, "desc": "分散型最適化勾配ブースティングの定番。" },
+        { "id": "lgbm", "name": "LightGBM", "category": "ml", "subcat": "tree", "color": "#EF4444", "paperOwa": 1.233, "isM4": false, "desc": "計算量を抑えて高速学習を可能にする決定木勾配ブースティング。" },
+        { "id": "svm", "name": "Support Vector Machine", "category": "ml", "subcat": "svm_grp", "color": "#EA580C", "paperOwa": 1.219, "isM4": false, "desc": "カーネル法によるマージン最大化非線形回帰(SVR)。" },
+        { "id": "mlp", "name": "MLP (ニューラルネット)", "category": "ml", "subcat": "nn", "color": "#B91C1C", "paperOwa": 1.614, "isM4": true, "desc": "3層以上の順伝播型全結合ニューラルネットワーク。" },
+        { "id": "rnn", "name": "RNN", "category": "ml", "subcat": "nn", "color": "#DC2626", "paperOwa": 1.506, "isM4": true, "desc": "LSTM/RNNを採用した再帰型ニューラルネットワーク。" },
+        { "id": "deepar", "name": "DeepAR", "category": "ml", "subcat": "nn", "color": "#991B1B", "paperOwa": 1.380, "isM4": false, "desc": "自律確率サンプリングを採用した自己回帰深層モデル。" },
+        { "id": "comb1", "name": "Comb 1", "category": "ensemble", "color": "#A78BFA", "paperOwa": 0.925, "isM4": true, "desc": "SES, Holt, Dampedのブレンド予測値平均。" },
+        { "id": "comb2", "name": "Comb 2", "category": "ensemble", "color": "#7C3AED", "paperOwa": 0.881, "isM4": false, "desc": "全個別モデルの動的上位3モデル平均。" },
+        { "id": "comb3", "name": "Comb 3", "category": "ensemble", "color": "#8B5CF6", "paperOwa": 0.864, "isM4": false, "desc": "異なる中分類トップの動的上位3モデル平均。" },
+        { "id": "comb4", "name": "Comb 4", "category": "ensemble", "color": "#6366F1", "paperOwa": 0.878, "isM4": false, "desc": "動的統計上位2モデル平均。" },
+        { "id": "comb5", "name": "Comb 5", "category": "ensemble", "color": "#4F46E5", "paperOwa": 0.981, "isM4": false, "desc": "動的機械学習上位2モデル平均。" },
+        { "id": "comb6", "name": "Comb 6", "category": "ensemble", "color": "#3730A3", "paperOwa": 0.886, "isM4": false, "desc": "動的統計上位2モデル＋動的機械学習上位1モデルの平均。" }
+      ],
+      "ensemble_rules": {
+        "comb1": { "type": "fixed", "members": ["ses", "holt", "damped"] },
+        "comb2": { "type": "top_n", "source": "all", "n": 3 },
+        "comb3": { "type": "top_subcats", "n_subcats": 3 },
+        "comb4": { "type": "top_n", "source": "statistical", "n": 2 },
+        "comb5": { "type": "top_n", "source": "ml", "n": 2 },
+        "comb6": { "type": "top_n_multi", "sources": [{"source": "statistical", "n": 2}, {"source": "ml", "n": 1}] }
+      }
+    };
+
+    // ★ オフライン用マニュアルフォールバック
+    const localManualFallback = {
+      "title": "📈 時系列予測ベンチマークシステム ユーザーマニュアル",
+      "version": "ver 7.1",
+      "last_updated": "2026-05-21",
+      "sections": [
+        { "title": "1. システム概要", "content": "本システムは、JSAI2022の学術論文に基づき、統計モデル・ML・DL・ハイブリッド全31手法の予測性能をOWA加重誤差指標から客観的に評価するベンチマーク基盤です。" },
+        { "title": "2. データ準備とCSV形式", "content": "Horizon（予測期数）や粒度（Freq）を設定し、データマッピングを紐付けてCSV（縦持ち）をドラッグして読み込ませます。「再生成」からいつでも疑似系列を作成可能です。" },
+        { "title": "3. 予測手法の動的アコーディオン選定", "content": "統計・MLを論文に沿った階層構造グループに分類表示。OWAや各手法の詳細なロジックをホバー説明で即時把握可能です。" },
+        { "title": "4. インタラクティブチャート（ズーム・パン・ロック）", "content": "折れ線グラフをスクロールホイールで自在にズームイン・アウト。さらにグラフ上を直接クリックすると、縦軸を赤線で固定（ロック）し、下部パネルで値をスクロール比較・コピー可能です。" },
+        { "title": "5. ランキングテーブルとグラフ線の目玉トグル", "content": "総合順位テーブルの左端のチェックボックスから、グラフ予測線の表示有無を動的制御。上部のヘッダーから一括表示・非表示も行えます。" }
+      ]
+    };
+
+    const existingRuleModel = { id: 'existing', name: '既存ルール予測', type: '社内定義ロジック', color: '#DC2626', paperOwa: '-' };
+
+    // ==========================================
+    // 状態管理
+    // ==========================================
+    let initialDataSeries = [];       
+    let existingRuleSeriesAll = [];   
+    let currentSeriesNames = [];
+    let hasExistingRule = false; 
+    let currentDataSettings = { horizon: 12, freq: 'M' };
+    
+    let chartInstance = null;
+    let currentApiResults = null;
+    let currentSeriesIndex = 0;
+    
+    // ロック（固定表示）管理用ステート
+    let isChartValueLocked = false; 
+    let lockedIndex = -1;
+    let currentHoverIndex = -1;
+
+    // ==========================================
+    // オンラインロード・起動・構築
+    // ==========================================
+    document.addEventListener('DOMContentLoaded', async () => {
+      await fetchConfiguration();
+      buildModelSelectionUI();
+      selectModels('m4');
+      regenerateData();
+    });
+
+    async function fetchConfiguration() {
+      const endpointBase = document.getElementById('apiEndpoint').value;
+      const apiOrigin = new URL(endpointBase).origin;
+      try {
+        const response = await fetch(`${apiOrigin}/api/config`);
+        if (response.ok) {
+          activeConfig = await response.json();
+          console.log("Configuration dynamically synced with FastAPI master!");
+        }
+      } catch (e) {
+        console.warn("Failed to reach FastAPI master config, using offline fallback. details:", e);
+      }
+    }
+
+    // ★マニュアルをAPIから非同期ロードし、モーダル内に流麗に構築する関数
+    async function openManualModal() {
+      const modal = document.getElementById('manualModal');
+      const content = document.getElementById('manualModalContent');
+      const body = document.getElementById('manualBody');
+      const title = document.getElementById('manualTitle');
+
+      modal.classList.remove('hidden');
+      setTimeout(() => {
+        content.classList.remove('scale-95');
+        content.classList.add('scale-100');
+      }, 50);
+
+      let config = localManualFallback;
+      const endpointBase = document.getElementById('apiEndpoint').value;
+      const apiOrigin = new URL(endpointBase).origin;
+      
+      try {
+        const response = await fetch(`${apiOrigin}/api/manual`);
+        if (response.ok) {
+          config = await response.json();
+        }
+      } catch (e) {
+        console.warn("Using local manual fallback. API not online.");
+      }
+
+      title.innerHTML = `${config.title} <span class="text-xs text-indigo-200 font-normal ml-2">${config.version} (最終更新: ${config.last_updated})</span>`;
+      
+      let html = '';
+      config.sections.forEach(sec => {
+        html += `
+          <div class="bg-gray-50 border border-gray-200 rounded-xl p-5 hover:border-indigo-300 hover:shadow-sm transition-all duration-200">
+            <h3 class="font-bold text-gray-800 text-sm border-b border-gray-200 pb-2 mb-3 flex items-center">
+              <span class="w-1.5 h-4 bg-indigo-600 rounded mr-2 shrink-0"></span>${sec.title}
+            </h3>
+            <p class="text-xs text-gray-600 whitespace-pre-wrap leading-relaxed">${sec.content}</p>
+          </div>
+        `;
+      });
+      body.innerHTML = html;
+    }
+
+    function closeManualModal() {
+      const modal = document.getElementById('manualModal');
+      const content = document.getElementById('manualModalContent');
+      content.classList.remove('scale-100');
+      content.classList.add('scale-95');
+      setTimeout(() => {
+        modal.classList.add('hidden');
+      }, 150);
+    }
+
+    // 中分類（subcat）の階層化UIを、ロードしたマスタ（activeConfig）から100%動的に生成します
+    function buildModelSelectionUI() {
+      const accordionContainer = document.getElementById('accordionContainer');
+      accordionContainer.innerHTML = '';
+
+      const cats = activeConfig.categories;
+      const subcats = activeConfig.subcategories;
+      const models = activeConfig.models;
+
+      // 大分類の処理
+      Object.entries(cats).forEach(([catId, catName]) => {
+        const isEnsemble = (catId === 'ensemble');
+        
+        let subcatHtml = '';
+        if (isEnsemble) {
+          // アンサンブルモデル（中分類なしのフラット構造）
+          const ensModels = models.filter(m => m.category === catId);
+          let gridHtml = '<div class="p-3 grid grid-cols-1 md:grid-cols-2 gap-2 bg-white">';
+          ensModels.forEach(model => {
+            gridHtml += createCheckboxHtml(model);
+          });
+          gridHtml += '</div>';
+          subcatHtml = gridHtml;
+        } else {
+          // 統計・機械学習モデル（中分類グループ化階層）
+          let groupHtml = '<div class="p-3 bg-white space-y-3">';
+          
+          // 各大分類に属する中分類（subcat）をモデル配列から動的に識別
+          const catModels = models.filter(m => m.category === catId);
+          const activeSubcatIds = [...new Set(catModels.map(m => m.subcat))];
+
+          activeSubcatIds.forEach(subId => {
+            const subName = subcats[subId] || subId;
+            const subModels = catModels.filter(m => m.subcat === subId);
+            
+            if (subModels.length > 0) {
+              const borderThemeColor = (catId === 'statistical') ? 'border-indigo-500 text-indigo-900 bg-indigo-50' : 'border-emerald-500 text-emerald-900 bg-emerald-50';
+              groupHtml += `
+                <div>
+                  <div class="mt-1 mb-1.5 px-2 py-0.5 border-l-4 rounded text-[11px] font-bold select-none ${borderThemeColor}">
+                    ■ ${subName}
+                  </div>
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+              `;
+              subModels.forEach(model => {
+                groupHtml += createCheckboxHtml(model);
+              });
+              groupHtml += `
+                  </div>
+                </div>
+              `;
+            }
+          });
+          groupHtml += '</div>';
+          subcatHtml = groupHtml;
+        }
+
+        // 大分類アコーディオン全体のレンダリング
+        const accordionHtml = `
+          <div class="border border-gray-200 rounded-lg overflow-hidden">
+            <div class="bg-gray-50 px-4 py-2.5 text-xs font-bold text-gray-700 border-b border-gray-200 flex justify-between items-center select-none">
+              <span>${catName}</span>
+            </div>
+            ${subcatHtml}
+          </div>
+        `;
+        accordionContainer.insertAdjacentHTML('beforeend', accordionHtml);
+      });
+    }
+
+    function createCheckboxHtml(model) {
+      return `
+        <label class="flex items-start space-x-3 cursor-pointer bg-white hover:bg-gray-50 p-2 rounded-lg border border-gray-100 hover:border-gray-300 transition group select-none">
+          <div class="pt-0.5">
+            <input type="checkbox" value="${model.id}" class="checkbox-custom model-cb transition" 
+                   style="background-color: white; border-color: #D1D5DB;" 
+                   onchange="updateCheckboxStyle(this, '${model.color}')">
+          </div>
+          <div class="flex flex-col min-w-0">
+            <span class="text-xs font-bold text-gray-800 group-hover:text-indigo-600 transition truncate">${model.name}</span>
+            <span class="text-[10px] text-gray-400 font-normal leading-tight">${model.desc}</span>
+          </div>
+        </label>
+      `;
+    }
+
+    // チェックボックス外観同期
+    function updateCheckboxStyle(cb, color) {
+      cb.style.backgroundColor = cb.checked ? color : 'white';
+      cb.style.borderColor = cb.checked ? color : '#D1D5DB';
+    }
+
+    function selectModels(type) {
+      document.querySelectorAll('.model-cb').forEach(cb => {
+        const modelDef = activeConfig.models.find(m => m.id === cb.value);
+        if (type === 'all') {
+          cb.checked = true;
+        } else if (type === 'clear') {
+          cb.checked = false;
+        } else if (type === 'm4') {
+          cb.checked = modelDef && modelDef.isM4;
+        }
+        if (modelDef) updateCheckboxStyle(cb, modelDef.color);
+      });
+    }
+
+    // ==========================================
+    // 擬似データの自動生成
+    // ==========================================
+    function regenerateData() {
+      const horizon = parseInt(document.getElementById('settingHorizon').value) || 12;
+      const freq = document.getElementById('settingFreq').value;
+      currentDataSettings = { horizon, freq };
+
+      initialDataSeries = [];
+      existingRuleSeriesAll = [];
+      currentSeriesNames = [];
+      hasExistingRule = true;
+      
+      const numSeries = 5; 
+      const trainLen = 60; 
+      const totalLen = trainLen + horizon;
+
+      for (let s = 0; s < numSeries; s++) {
+        currentSeriesNames.push(`検証用系列-0${s + 1}`);
+        let val = 120 + Math.random() * 80; 
+        let data = [];
+        let existing = [];
+        let trend = (Math.random() - 0.4) * 2; 
+        let season = 3 + Math.random() * 2; 
+
+        for (let i = 0; i < totalLen; i++) {
+          val += trend + Math.sin(i / season) * 4 + (Math.random() - 0.5) * 5;
+          data.push(val);
+          existing.push(val + (Math.random() - 0.5) * 3);
+        }
+        initialDataSeries.push(data);
+        existingRuleSeriesAll.push(existing);
+      }
+      
+      document.getElementById('dataStatusTitle').innerText = "検証用の擬似時系列データを使用中";
+      document.getElementById('dataStatusDesc').innerText = `データ: ${numSeries}系列 × ${totalLen}期 (学習:${trainLen}期 / 予測:${horizon}期)`;
+    }
+
+    // ==========================================
+    // CSV アップロード読み込み処理 (縦持ち)
+    // ==========================================
+    function handleFileUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const horizon = parseInt(document.getElementById('settingHorizon').value) || 12;
+      const freq = document.getElementById('settingFreq').value;
+      currentDataSettings = { horizon, freq };
+
+      const colSeries = document.getElementById('colSeries').value.trim();
+      const colTime = document.getElementById('colTime').value.trim();
+      const colActual = document.getElementById('colActual').value.trim();
+      const colForecast = document.getElementById('colForecast').value.trim();
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const text = e.target.result;
+        const lines = text.split('\n').map(l => l.trim()).filter(l => l !== '');
+        if(lines.length < 2) {
+          alert("CSVに有効なデータ行が存在しません。"); return;
+        }
+
+        const headers = lines[0].split(',').map(h => h.trim());
+        const idxSeries = headers.indexOf(colSeries);
+        const idxTime = headers.indexOf(colTime);
+        const idxActual = headers.indexOf(colActual);
+        const idxForecast = headers.indexOf(colForecast);
+
+        if (idxSeries === -1 || idxTime === -1 || idxActual === -1 || idxForecast === -1) {
+          alert(`CSVカラムが見つかりません。現在のヘッダーを確認してください:\n${headers.join(', ')}`);
+          return;
+        }
+
+        const seriesMap = {};
+        for(let i = 1; i < lines.length; i++) {
+          const parts = lines[i].split(',');
+          if(parts.length <= Math.max(idxSeries, idxTime, idxActual, idxForecast)) continue;
+          
+          const sName = parts[idxSeries].trim();
+          const tVal = parts[idxTime].trim();
+          const aVal = parseFloat(parts[idxActual].trim());
+          const fVal = parseFloat(parts[idxForecast].trim());
+
+          if(!seriesMap[sName]) seriesMap[sName] = [];
+          seriesMap[sName].push({
+            time: tVal,
+            actual: isNaN(aVal) ? null : aVal,
+            forecast: isNaN(fVal) ? null : fVal
+          });
+        }
+
+        const sNames = Object.keys(seriesMap);
+        if(sNames.length === 0) {
+          alert("有効な系列データが抽出できませんでした。"); return;
+        }
+
+        initialDataSeries = [];
+        existingRuleSeriesAll = [];
+        currentSeriesNames = sNames;
+        hasExistingRule = true;
+
+        let minLen = Infinity;
+        sNames.forEach(sName => {
+          seriesMap[sName].sort((a, b) => a.time.localeCompare(b.time));
+          const aData = seriesMap[sName].map(item => item.actual);
+          const fData = seriesMap[sName].map(item => item.forecast);
+          
+          initialDataSeries.push(aData);
+          existingRuleSeriesAll.push(fData);
+          if(aData.length < minLen) minLen = aData.length;
+        });
+
+        if (minLen <= horizon) {
+          alert("データ長が予測期間を下回っています。設定を見直してください。");
+          return;
+        }
+
+        document.getElementById('dataStatusTitle').innerText = "✅ CSVデータセットの読み込み完了";
+        document.getElementById('dataStatusDesc').innerText = `データ: ${sNames.length}系列 × 約${minLen}期 (学習:${minLen - horizon}期 / 予測:${horizon}期)`;
+      };
+      reader.readAsText(file);
+      event.target.value = '';
+    }
+
+    // ==========================================
+    // API 通信 & 実行シミュレーション
+    // ==========================================
+    async function submitToBackend() {
+      const selectedIds = Array.from(document.querySelectorAll('.model-cb:checked')).map(cb => cb.value);
+      if(selectedIds.length === 0) {
+        alert('予測対象のアルゴリズムを最低1つは選定してください。');
+        return;
+      }
+
+      if(!selectedIds.includes('naive2')) selectedIds.push('naive2');
+
+      const mode = document.getElementById('apiConnectionMode').value;
+      const endpoint = document.getElementById('apiEndpoint').value;
+
+      document.getElementById('view-setup').classList.add('hidden');
+      document.getElementById('view-loading').classList.remove('hidden');
+      
+      const loadingText = document.getElementById('loading-text');
+      const bar = document.getElementById('loading-bar');
+      const loadingTitle = document.getElementById('loadingTitle');
+
+      if (mode === 'api') {
+        loadingTitle.innerText = "FastAPI 予測プロセス実行中";
+        loadingText.innerText = "実時系列データを送信して学習処理を実行しています...";
+        bar.style.width = "30%";
+
+        const payload = {
+          data_series: initialDataSeries,
+          horizon: currentDataSettings.horizon,
+          selected_ids: selectedIds,
+          existing_rule_series: hasExistingRule ? existingRuleSeriesAll : null,
+          settings: { freq: currentDataSettings.freq }
+        };
+
+        try {
+          const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          
+          if(!response.ok) throw new Error("APIサーバーの応答ステータスエラー");
+          
+          bar.style.width = "80%";
+          loadingText.innerText = "検証評価値のソートを集計中...";
+          const data = await response.json();
+          bar.style.width = "100%";
+          
+          setTimeout(() => {
+            document.getElementById('view-loading').classList.add('hidden');
+            handleAPIResponse(data);
+          }, 600);
+          
+        } catch (error) {
+          console.error(error);
+          alert(`FastAPIサーバー接続エラーが発生しました。接続モードを「ローカル模擬予測」にフォールバックして処理を行います。`);
+          document.getElementById('apiConnectionMode').value = 'mock';
+          toggleApiMode();
+          runLocalSimulation(selectedIds);
+        }
+      } else {
+        runLocalSimulation(selectedIds);
+      }
+    }
+
+    // ローカルシミュレーションフォールバック
+    function runLocalSimulation(selectedIds) {
+      const loadingText = document.getElementById('loading-text');
+      const bar = document.getElementById('loading-bar');
+      const loadingTitle = document.getElementById('loadingTitle');
+      
+      loadingTitle.innerText = "ローカル予測エンジン実行中";
+      bar.style.width = "20%";
+      setTimeout(() => { bar.style.width = "60%"; loadingText.innerText = "シミュレーション特徴量のラグ行列を構成中..."; }, 1000);
+      setTimeout(() => { bar.style.width = "90%"; loadingText.innerText = "予測ブレンドとOWA適合度算出を完了しました..."; }, 2200);
+
+      setTimeout(() => {
+        document.getElementById('view-loading').classList.add('hidden');
+        const mockResult = generateMockBenchmarkResponse(selectedIds);
+        handleAPIResponse(mockResult);
+      }, 3000);
+    }
+
+    // ローカル模擬予測データビルダー (構成マスタ activeConfig をベースに動的計算)
+    function generateMockBenchmarkResponse(selectedIds) {
+      const horizon = currentDataSettings.horizon;
+      const numS = initialDataSeries.length;
+      
+      const trainSeries = initialDataSeries.map(series => series.slice(0, -horizon));
+      const actualSeries = initialDataSeries.map(series => series.slice(-horizon));
+
+      const mockResults = [];
+      const targetIds = [...selectedIds];
+      if (hasExistingRule && !targetIds.includes('existing')) targetIds.unshift('existing');
+      if (!targetIds.includes('naive2')) targetIds.push('naive2');
+
+      const allForecasts = {};
+      
+      // JSON構成 activeConfig から個別モデル群のキーリストを完全に動的ロード
+      const models_meta = activeConfig.models;
+      const subcat_groups = activeConfig.subcat_groups;
+      const ensemble_rules = activeConfig.ensemble_rules;
+
+      const individualKeys = models_meta.filter(m => m.category !== 'ensemble').map(m => m.id);
+
+      // 個別モデルの予測値生成
+      individualKeys.forEach(id => {
+        allForecasts[id] = [];
+        for (let s = 0; s < numS; s++) {
+          const actual = actualSeries[s];
+          const train = trainSeries[s];
+          const lastVal = train[train.length - 1] || 100;
+          
+          let forecast = [];
+          const modelDef = models_meta.find(m => m.id === id);
+          const paperOwa = modelDef ? parseFloat(modelDef.paperOwa) || 1.0 : 1.0;
+
+          for (let i = 0; i < horizon; i++) {
+            const errWeight = (id === 'existing') ? 0.02 : (paperOwa * 0.04);
+            const noise = (Math.random() - 0.5) * lastVal * errWeight;
+            forecast.push(actual[i] + noise);
+          }
+          allForecasts[id].push(forecast);
+        }
+      });
+
+      if (hasExistingRule) {
+        allForecasts['existing'] = [];
+        for (let s = 0; s < numS; s++) {
+          allForecasts['existing'].push(existingRuleSeriesAll[s].slice(-horizon));
+        }
+      }
+
+      // 個別モデルの仮のOWA集計
+      const individualScores = [];
+      individualKeys.forEach(id => {
+        let smapeSum = 0;
+        let maseSum = 0;
+        for (let s = 0; s < numS; s++) {
+          const act = actualSeries[s];
+          const fct = allForecasts[id][s];
+          const train = trainSeries[s];
+          const lastVal = train[train.length - 1] || 100;
+          
+          let absErrSum = 0;
+          let sumActualAndFct = 0;
+          for (let i = 0; i < horizon; i++) {
+            absErrSum += Math.abs(act[i] - fct[i]);
+            sumActualAndFct += (Math.abs(act[i]) + Math.abs(fct[i])) / 2.0;
+          }
+          smapeSum += (absErrSum / (sumActualAndFct || 1)) * 100.0 / horizon;
+          maseSum += (absErrSum / horizon) / (lastVal * 0.03 || 1);
+        }
+        
+        const modelDef = models_meta.find(m => m.id === id);
+        const owaRef = modelDef ? parseFloat(modelDef.paperOwa) || 1.0 : 1.0;
+        individualScores.push({ id: id, owa: owaRef * (0.95 + Math.random() * 0.1) });
+      });
+
+      individualScores.sort((a, b) => a.owa - b.owa);
+      const sortedIndividualIds = individualScores.map(x => x.id);
+
+      // 予測値の平均によるブレンド
+      const ensemble_models_keys = models_meta.filter(m => m.category === 'ensemble').map(m => m.id);
+      ensemble_models_keys.forEach(comb_id => {
+        allForecasts[comb_id] = [];
+        for (let s = 0; s < numS; s++) {
+          allForecasts[comb_id].push(new Array(horizon).fill(0));
+        }
+      });
+
+      const temp_ranked_list = individualScores; 
+
+      for (let s = 0; s < numS; s++) {
+        const getVal = (m_id, idx) => (allForecasts[m_id] && allForecasts[m_id][s]) ? allForecasts[m_id][s][idx] : actualSeries[s][idx];
+        
+        Object.entries(ensemble_rules).forEach(([comb_id, rule_def]) => {
+          const rule_type = rule_def.type;
+          let sub_ids = [];
+
+          if (rule_type === 'fixed') {
+            sub_ids = rule_def.members;
+          } else if (rule_type === 'top_n') {
+            const source = rule_def.source;
+            const n = rule_def.n;
+            
+            let pool = [];
+            if (source === 'statistical') {
+              pool = sortedIndividualIds.filter(id => subcat_groups.naive.includes(id) || subcat_groups.smoothing.includes(id) || subcat_groups.arima_grp.includes(id) || subcat_groups.state_space.includes(id));
+            } else if (source === 'ml') {
+              pool = sortedIndividualIds.filter(id => subcat_groups.linear_reg.includes(id) || subcat_groups.tree.includes(id) || subcat_groups.svm_grp.includes(id) || subcat_groups.nn.includes(id));
+            } else {
+              pool = sortedIndividualIds;
+            }
+            sub_ids = pool.slice(0, n);
+            
+          } else if (rule_type === 'top_subcats') {
+            const n_subcats = rule_def.n_subcats;
+            const subcat_bests = {};
+            
+            Object.entries(subcat_groups).forEach(([subId, members]) => {
+              const best_id = sortedIndividualIds.find(id => members.includes(id));
+              if (best_id) {
+                const owa = individualScores.find(x => x.id === best_id).owa;
+                subcat_bests[subId] = { id: best_id, owa: owa };
+              }
+            });
+            const sortedBests = Object.entries(subcat_bests).map(x => x[1]).sort((a,b) => a.owa - b.owa);
+            sub_ids = sortedBests.slice(0, n_subcats).map(x => x.id);
+            
+          } else if (rule_type === 'top_n_multi') {
+            const stat_pool = [...subcat_groups.naive, ...subcat_groups.smoothing, ...subcat_groups.arima_grp, ...subcat_groups.state_space];
+            const ml_pool = [...subcat_groups.linear_reg, ...subcat_groups.tree, ...subcat_groups.svm_grp, ...subcat_groups.nn];
+            
+            rule_def.sources.forEach(src_rule => {
+              if (src_rule.source === 'statistical') {
+                sub_ids.push(...sortedIndividualIds.filter(id => stat_pool.includes(id)).slice(0, src_rule.n));
+              } else if (src_rule.source === 'ml') {
+                sub_ids.push(...sortedIndividualIds.filter(id => ml_pool.includes(id)).slice(0, src_rule.n));
+              }
+            });
+          }
+
+          // 平均値をブレンド
+          for (let i = 0; i < horizon; i++) {
+            const vals = sub_ids.map(m_id => getVal(m_id, i));
+            allForecasts[comb_id][s][i] = vals.length > 0 ? (vals.reduce((a,b)=>a+b, 0) / vals.length) : actualSeries[s][i];
+          }
+        });
+      }
+
+      // 最終集計
+      targetIds.forEach(id => {
+        if (id === 'naive2' && !selectedIds.includes('naive2')) return;
+        
+        let smapeSum = 0;
+        let maseSum = 0;
+
+        for (let s = 0; s < numS; s++) {
+          const act = actualSeries[s];
+          const fct = allForecasts[id][s];
+          const train = trainSeries[s];
+          const lastVal = train[train.length - 1] || 100;
+          
+          let absErrSum = 0;
+          let sumActualAndFct = 0;
+          for (let i = 0; i < horizon; i++) {
+            absErrSum += Math.abs(act[i] - fct[i]);
+            sumActualAndFct += (Math.abs(act[i]) + Math.abs(fct[i])) / 2.0;
+          }
+          smapeSum += (absErrSum / (sumActualAndFct || 1)) * 100.0 / horizon;
+          maseSum += (absErrSum / horizon) / (lastVal * 0.03 || 1);
+        }
+
+        const baseDef = models_meta.find(m => m.id === id) || (id === 'existing' ? existingRuleModel : null);
+        const paperOwaVal = baseDef ? parseFloat(baseDef.paperOwa) || 1.0 : 1.0;
+
+        mockResults.push({
+          id: id,
+          forecasts: allForecasts[id],
+          mape: smapeSum / numS,
+          mase: maseSum / numS,
+          owa: (id === 'existing') ? 0.885 : paperOwaVal * (0.95 + Math.random() * 0.1)
+        });
+      });
+
+      mockResults.sort((a,b) => a.owa - b.owa);
+
+      return {
+        status: "success",
+        train_data: trainSeries,
+        actual_val_data: actualSeries,
+        results: mockResults
+      };
+    }
+
+    // ==========================================
+    // API レスポンス解析 & UI描画
+    // ==========================================
+    async function handleAPIResponse(apiResponse) {
+      if(apiResponse.status !== "success") return;
+
+      document.getElementById('step1-indicator').classList.add('opacity-50');
+      document.getElementById('step2-indicator').classList.remove('opacity-50');
+      document.getElementById('step2-indicator').querySelector('div').classList.replace('bg-gray-300', 'bg-indigo-600');
+      document.getElementById('step2-indicator').querySelector('div').classList.replace('text-gray-600', 'text-white');
+      document.getElementById('step2-indicator').querySelector('span').classList.replace('text-gray-500', 'text-indigo-900');
+      document.getElementById('step-line').classList.replace('border-gray-200', 'border-indigo-400');
+      document.getElementById('view-results').classList.remove('hidden');
+
+      currentApiResults = apiResponse;
+      currentSeriesIndex = 0;
+      
+      // ロック状態を解除
+      isChartValueLocked = false;
+      lockedIndex = -1;
+      currentHoverIndex = -1;
+
+      const { train_data, actual_val_data, results } = apiResponse;
+
+      const selector = document.getElementById('seriesSelector');
+      selector.innerHTML = '';
+      for(let i=0; i<train_data.length; i++) {
+        const opt = document.createElement('option');
+        opt.value = i;
+        opt.text = currentSeriesNames[i] ? currentSeriesNames[i] : `系列-0${i + 1}`;
+        selector.appendChild(opt);
+      }
+
+      renderChart(train_data, actual_val_data, results);
+      renderTable(results);
+
+      // LLMコメント生成
+      const commentContainer = document.getElementById('evaluation-comment');
+      commentContainer.innerHTML = `
+        <div class="flex items-center space-x-2 text-indigo-600 py-1">
+          <div class="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+          <span class="font-bold text-xs">API統合モデルからのメタ分析結果を取得しています...</span>
+        </div>
+      `;
+      
+      setTimeout(() => {
+        const bestModel = results[0];
+        const mDef = activeConfig.models.find(m => m.id === bestModel.id) || (bestModel.id === 'existing' ? existingRuleModel : null);
+        let commentText = `今回のベンチマーク（全${train_data.length}系列を統合した自動評価）では、**${mDef.name}** が最も優れたパフォーマンスを発揮しました（総合 OWA: **${bestModel.owa.toFixed(3)}**）。<br>`;
+        
+        if (bestModel.id === 'existing') {
+          commentText += "📊 **総合分析結果:** 既存のルールベース予測は非常に健牢で、多くの統計・機械学習モデルの予測性能を上回りました。現在の社内ロジックが持つドメイン知識の正しさが数学的に立証されたため、今後は既存ルールモデルを特徴量に組み込んだハイブリッド型アンサンブル（Combなど）の開発が推奨されます。";
+        } else if (bestModel.id.startsWith('comb')) {
+          commentText += "📊 **総合分析結果:** M4 Competition等の結果に違わず、単一予測モデルより本物の「アンサンブル組み合わせ（Comb）」が上位を独占しました。各時系列が独立して保有する確率変動の分散がうまくブレンドにより相殺され、平均絶対誤差(MASE)において最高レベルの予測性能が期待できます。";
+        } else {
+          commentText += `📊 **総合分析結果:** **${mDef.name}** が極めて高性能です。しかし個別系列チャートを確認すると、特定系列において過学習による極端なスパイクが見られる場合があります。テーブル内の各モデル名にマウスを合わせ、予測のトレンド形状を十分に評価してからデプロポ判断を行ってください。`;
+        }
+        commentContainer.innerHTML = commentText;
+      }, 1500);
+    }
+
+    function changeChartSeries() {
+      isChartValueLocked = false;
+      lockedIndex = -1;
+      clearHoverPanel();
+      
+      const selector = document.getElementById('seriesSelector');
+      currentSeriesIndex = parseInt(selector.value);
+      if(currentApiResults) {
+        renderChart(currentApiResults.train_data, currentApiResults.actual_val_data, currentApiResults.results);
+      }
+    }
+
+    function backToSetup() {
+      isChartValueLocked = false;
+      lockedIndex = -1;
+      clearHoverPanel();
+      
+      document.getElementById('view-results').classList.add('hidden');
+      document.getElementById('view-setup').classList.remove('hidden');
+      document.getElementById('step2-indicator').classList.add('opacity-50');
+      document.getElementById('step1-indicator').classList.remove('opacity-50');
+      document.getElementById('step2-indicator').querySelector('div').classList.replace('bg-indigo-600', 'bg-gray-300');
+      document.getElementById('step2-indicator').querySelector('div').classList.replace('text-white', 'text-gray-600');
+      document.getElementById('step2-indicator').querySelector('span').classList.replace('text-indigo-900', 'text-gray-500');
+      document.getElementById('step-line').classList.replace('border-indigo-400', 'border-gray-200');
+    }
+
+    // ==========================================
+    // 予測グラフのホバー情報バッジパネル描画ロジック (スクロール固定・全文字表示対応)
+    // ==========================================
+    function updateHoverPanel(index) {
+      if (index < 0 || !currentApiResults || !chartInstance) return;
+      currentHoverIndex = index;
+      const panel = document.getElementById('hoverInfoPanel');
+      if (!panel) return;
+
+      const labels = chartInstance.data.labels;
+      const timeLabel = labels[index] || `t+${index + 1}`;
+      
+      let headerRightHtml = '';
+      if (isChartValueLocked && lockedIndex === index) {
+        headerRightHtml = `
+          <div class="flex items-center space-x-2 shrink-0">
+            <span class="bg-red-100 text-red-800 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center animate-pulse">
+              <span class="w-1.5 h-1.5 rounded-full bg-red-600 mr-1"></span>📌 固定表示中
+            </span>
+            <button onclick="unlockChartValues(); event.stopPropagation();" class="text-[10px] font-bold text-gray-500 hover:text-indigo-600 bg-gray-100 hover:bg-gray-200 px-2.5 py-0.5 rounded transition">
+              🔓 解除
+            </button>
+          </div>
+        `;
+      } else {
+        headerRightHtml = `
+          <span class="text-[10px] text-indigo-500 font-semibold flex items-center shrink-0">
+            💡 グラフ上をクリックすると数値を固定できます
+          </span>
+        `;
+      }
+
+      let html = `
+        <div class="w-full">
+          <div class="flex items-center justify-between border-b border-gray-200 pb-1.5 mb-2">
+            <span class="font-bold text-gray-700 text-xs">🕒 時点: <span class="text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded ml-1 font-mono">${timeLabel}</span></span>
+            ${headerRightHtml}
+          </div>
+          <div class="max-h-[160px] overflow-y-auto pr-1 scroll-area">
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2">
+      `;
+
+      let hasData = false;
+
+      chartInstance.data.datasets.forEach((ds, idx) => {
+        const meta = chartInstance.getDatasetMeta(idx);
+        if (meta.hidden) return;
+
+        const val = ds.data[index];
+        if (val === null || val === undefined) return;
+
+        hasData = true;
+        const color = ds.borderColor;
+
+        html += `
+          <div class="flex items-center justify-between p-2 rounded-lg border border-gray-200 bg-gray-50 hover:bg-white transition-colors duration-150 shadow-sm min-w-0 col-span-1">
+            <div class="flex items-center min-w-0 mr-2">
+              <span class="w-2.5 h-2.5 rounded-full mr-1.5 shrink-0" style="background-color: ${color}"></span>
+              <span class="font-bold text-gray-700 text-[11px] leading-snug break-all whitespace-normal" title="${ds.label}">${ds.label}</span>
+            </div>
+            <span class="font-bold text-indigo-900 shrink-0 text-[11px] font-mono ml-auto pl-1">${val.toFixed(2)}</span>
+          </div>
+        `;
+      });
+
+      if (!hasData) {
+        panel.innerHTML = `
+          <div class="text-center py-2">
+            <p class="text-gray-400 text-xs">表示ONのデータがありません。</p>
+          </div>
+        `;
+        return;
+      }
+
+      html += `
+            </div>
+          </div>
+        </div>
+      `;
+      panel.innerHTML = html;
+      panel.classList.remove('text-gray-500');
+      
+      if (isChartValueLocked && lockedIndex === index) {
+        panel.classList.remove('border-gray-200');
+        panel.classList.add('bg-white', 'border-red-300', 'ring-2', 'ring-red-50');
+      } else {
+        panel.classList.remove('border-red-300', 'ring-2', 'ring-red-50');
+        panel.classList.add('bg-white', 'border-gray-200');
+      }
+    }
+
+    function clearHoverPanel() {
+      if (isChartValueLocked) return;
+      currentHoverIndex = -1;
+      const panel = document.getElementById('hoverInfoPanel');
+      if (!panel) return;
+      panel.innerHTML = `
+        <div class="text-center">
+          <svg class="w-6 h-6 mx-auto text-gray-400 mb-1.5 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"></path>
+          </svg>
+          <p class="font-medium text-gray-500">グラフの上にマウスをホバー、または<span class="font-bold text-indigo-600 text-xs">グラフ上を直接クリック</span>すると数値をロックしてゆっくりスクロール比較できます。</p>
+        </div>
+      `;
+      panel.classList.add('text-gray-500');
+      panel.classList.remove('bg-white', 'border-gray-200', 'border-red-300', 'ring-2', 'ring-red-50');
+    }
+
+    function unlockChartValues() {
+      isChartValueLocked = false;
+      lockedIndex = -1;
+      clearHoverPanel();
+      if (chartInstance) {
+        chartInstance.draw(); 
+      }
+    }
+
+    // ==========================================
+    // 予測グラフ描画 (Chart.js + ズーム/パン統合)
+    // ==========================================
+    function renderChart(trainDataAll, actualDataAll, results) {
+      const ctx = document.getElementById('forecastChart').getContext('2d');
+      
+      const train = trainDataAll[currentSeriesIndex];
+      const actual = actualDataAll[currentSeriesIndex];
+      const totalLen = train.length + actual.length;
+      
+      const labels = [];
+      for (let i = 0; i < totalLen; i++) {
+        labels.push(`t+${i + 1}`);
+      }
+
+      const pastData = [...train, ...Array(actual.length).fill(null)];
+      const actualDataLine = [...Array(train.length - 1).fill(null), train[train.length-1], ...actual];
+
+      const datasets = [
+        {
+          label: '実績 (学習期間)',
+          data: pastData,
+          borderColor: '#111827', 
+          borderWidth: 2,
+          fill: false,
+          tension: 0.1,
+          pointRadius: 0,
+          pointHitRadius: 10,
+          _modelId: 'actual_past',
+          _baseColor: '#111827'
+        },
+        {
+          label: '実績 (評価期間)',
+          data: actualDataLine,
+          borderColor: '#4B5563', 
+          borderWidth: 2.5,
+          borderDash: [5, 4],
+          fill: false,
+          tension: 0.1,
+          pointRadius: 2.5,
+          pointBackgroundColor: 'white',
+          _modelId: 'actual_eval',
+          _baseColor: '#4B5563'
+        }
+      ];
+
+      results.forEach((res, index) => {
+        const mDef = activeConfig.models.find(m => m.id === res.id) || (res.id === 'existing' ? existingRuleModel : null);
+        if(!mDef) return;
+
+        const isExisting = res.id === 'existing';
+        const isInitiallyVisible = index < 3 || isExisting; // 上位3つ及び既存ルールを初期表示にする
+
+        const forecastSeries = res.forecasts[currentSeriesIndex] || [];
+        const modelData = [...Array(train.length - 1).fill(null), train[train.length-1], ...forecastSeries];
+        
+        const baseColor = mDef.color;
+
+        datasets.push({
+          label: mDef.name,
+          data: modelData,
+          borderColor: baseColor,
+          borderWidth: isExisting ? 2.5 : 2.0,
+          fill: false,
+          tension: 0.1,
+          pointRadius: 0,
+          pointHitRadius: 10,
+          borderDash: isExisting ? [8, 3] : [],
+          hidden: !isInitiallyVisible, 
+          
+          _modelId: res.id,
+          _baseColor: baseColor,
+          _isExisting: isExisting,
+          _originalColor: isInitiallyVisible ? baseColor : '#E5E7EB',
+          _originalWidth: isInitiallyVisible ? (isExisting ? 2.5 : 2.0) : 1.0,
+          order: isInitiallyVisible ? 10 : 20
+        });
+      });
+
+      if (chartInstance) chartInstance.destroy();
+
+      // ★ 縦線描画プラグイン (固定表示ロックに対応)
+      const verticalLinePlugin = {
+        id: 'verticalLine',
+        afterDatasetsDraw(chart) {
+          let drawX = null;
+          
+          if (isChartValueLocked && lockedIndex !== -1) {
+            const meta = chart.getDatasetMeta(0);
+            if (meta.data && meta.data[lockedIndex]) {
+              drawX = meta.data[lockedIndex].x;
+            }
+          } else if (chart.tooltip?._active && chart.tooltip._active.length) {
+            const activePoint = chart.tooltip._active[0];
+            drawX = activePoint.element.x;
+          }
+
+          if (drawX !== null) {
+            const ctx = chart.ctx;
+            const topY = chart.scales.y.top;
+            const bottomY = chart.scales.y.bottom;
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(drawX, topY);
+            ctx.lineTo(drawX, bottomY);
+            ctx.lineWidth = 1.5;
+            ctx.strokeStyle = isChartValueLocked ? '#EF4444' : '#4F46E5'; 
+            ctx.setLineDash([3, 3]);
+            ctx.stroke();
+            ctx.restore();
+          }
+        }
+      };
+
+      // ★ 動的ホバー値パネル連動トラッカープラグイン (クリックロックを検知)
+      const hoverTrackerPlugin = {
+        id: 'hoverTracker',
+        afterEvent(chart, args) {
+          const event = args.event;
+          
+          if (event.type === 'click') {
+            const activeElements = chart.getElementsAtEventForMode(event.native, 'index', { intersect: false }, true);
+            if (activeElements && activeElements.length > 0) {
+              const index = activeElements[0].index;
+              if (isChartValueLocked && lockedIndex === index) {
+                isChartValueLocked = false;
+                lockedIndex = -1;
+                clearHoverPanel();
+              } else {
+                isChartValueLocked = true;
+                lockedIndex = index;
+                updateHoverPanel(index);
+              }
+              chart.draw(); 
+            }
+            return;
+          }
+
+          if (!isChartValueLocked) {
+            if (event.type === 'mousemove') {
+              const activeElements = chart.getElementsAtEventForMode(event.native, 'index', { intersect: false }, true);
+              if (activeElements && activeElements.length > 0) {
+                const index = activeElements[0].index;
+                updateHoverPanel(index);
+              } else {
+                clearHoverPanel();
+              }
+            } else if (event.type === 'mouseout' || event.type === 'mouseleave') {
+              clearHoverPanel();
+            }
+          }
+        }
+      };
+
+      chartInstance = new Chart(ctx, {
+        type: 'line',
+        data: { labels, datasets },
+        plugins: [verticalLinePlugin, hoverTrackerPlugin], 
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { display: false }, 
+            tooltip: { enabled: false }, 
+            zoom: {
+              pan: {
+                enabled: true,
+                mode: 'xy',
+              },
+              zoom: {
+                wheel: {
+                  enabled: true,
+                  speed: 0.08
+                },
+                pinch: {
+                  enabled: true
+                },
+                mode: 'x'
+              }
+            }
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { font: { size: 9 } } },
+            y: { grid: { color: '#F3F4F6' }, ticks: { font: { size: 9 } } }
+          }
+        }
+      });
+    }
+
+    // 外部ボタンからChart.jsのズームを制御
+    function zoomChart(ratio) {
+      if (chartInstance) {
+        chartInstance.zoom(ratio);
+      }
+    }
+
+    function resetZoomChart() {
+      if (chartInstance) {
+        chartInstance.resetZoom();
+      }
+    }
+
+    // 右テーブル側からの非表示/表示の制御
+    function toggleModelVisibility(modelId, visible) {
+      if (!chartInstance) return;
+      
+      chartInstance.data.datasets.forEach((ds, index) => {
+        if (ds._modelId === modelId) {
+          chartInstance.setDatasetVisibility(index, visible);
+          ds._originalColor = visible ? ds._baseColor : '#E5E7EB';
+          ds._originalWidth = visible ? (ds._isExisting ? 2.5 : 2.0) : 1.0;
+        }
+      });
+      chartInstance.update();
+      
+      if (currentHoverIndex !== -1) {
+        updateHoverPanel(currentHoverIndex);
+      }
+    }
+
+    // 一括表示切り替え
+    function toggleAllTableModels(visible) {
+      if (!chartInstance || !currentApiResults) return;
+
+      const checkboxes = document.querySelectorAll('#benchmarkTableBody input[type="checkbox"]');
+      checkboxes.forEach(cb => {
+        cb.checked = visible;
+      });
+
+      chartInstance.data.datasets.forEach((ds, index) => {
+        if (ds._modelId && ds._modelId !== 'actual_past' && ds._modelId !== 'actual_eval') {
+          chartInstance.setDatasetVisibility(index, visible);
+          ds._originalColor = visible ? ds._baseColor : '#E5E7EB';
+          ds._originalWidth = visible ? (ds._isExisting ? 2.5 : 2.0) : 1.0;
+        }
+      });
+      chartInstance.update();
+
+      if (currentHoverIndex !== -1) {
+        updateHoverPanel(currentHoverIndex);
+      }
+    }
+
+    // テーブル行ホバーでの一時強調ハイライト
+    function highlightChart(modelId) {
+      if(!chartInstance) return;
+      chartInstance.data.datasets.forEach((ds, index) => {
+        if(ds._modelId) {
+          if (ds._modelId === modelId) {
+             chartInstance.setDatasetVisibility(index, true); 
+             ds.borderColor = ds._baseColor;
+             ds.borderWidth = ds._isExisting ? 3.5 : 2.5;
+             ds.order = 1; 
+          } else if (ds._modelId !== 'actual_past' && ds._modelId !== 'actual_eval') {
+             ds.borderColor = '#F1F5F9'; 
+             ds.borderWidth = 0.8;
+             ds.order = 30;
+          }
+        }
+      });
+      chartInstance.update('none'); 
+    }
+
+    // ハイライトから復帰
+    function resetChartHighlight() {
+      if(!chartInstance) return;
+      chartInstance.data.datasets.forEach((ds, index) => {
+        if(ds._modelId && ds._modelId !== 'actual_past' && ds._modelId !== 'actual_eval') {
+          const cb = document.getElementById(`visible_cb_${ds._modelId}`);
+          const isVisible = cb ? cb.checked : false;
+
+          chartInstance.setDatasetVisibility(index, isVisible);
+          ds.borderColor = isVisible ? ds._baseColor : '#E5E7EB';
+          ds.borderWidth = ds._originalWidth;
+          ds.order = isVisible ? 10 : 20;
+        }
+      });
+      chartInstance.update('none');
+    }
+
+    // ==========================================
+    // ベンチマークテーブル描画 (表示スイッチを完全装備)
+    // ==========================================
+    function renderTable(results) {
+      const tbody = document.getElementById('benchmarkTableBody');
+      tbody.innerHTML = '';
+      
+      results.forEach((res, index) => {
+        const isBest = index === 0;
+        const isExisting = res.id === 'existing';
+        const mDef = activeConfig.models.find(m => m.id === res.id) || (isExisting ? existingRuleModel : null);
+        if(!mDef) return;
+
+        const isInitiallyVisible = index < 3 || isExisting;
+
+        const tr = document.createElement('tr');
+        tr.className = `hover-row ${isBest ? 'bg-indigo-50/60' : (isExisting ? 'bg-red-50/40' : 'bg-white')} hover:bg-gray-50`;
+        
+        tr.onmouseenter = () => highlightChart(res.id);
+        tr.onmouseleave = () => resetChartHighlight();
+        
+        tr.innerHTML = `
+          <td class="px-3 py-2.5 whitespace-nowrap">
+            <div class="flex items-center space-x-2.5">
+              <input type="checkbox" id="visible_cb_${res.id}" class="w-3.5 h-3.5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer" 
+                     ${isInitiallyVisible ? 'checked' : ''} 
+                     onchange="toggleModelVisibility('${res.id}', this.checked); event.stopPropagation();">
+              
+              <div class="flex flex-col min-w-0">
+                <div class="flex items-center">
+                  <span class="w-2.5 h-2.5 rounded-full mr-1.5 shadow-sm flex-shrink-0" style="background-color: ${mDef.color}"></span>
+                  <span class="truncate ${isBest ? 'font-bold text-indigo-900' : 'font-medium text-gray-900'}">${mDef.name}</span>
+                  ${isBest ? '<span class="ml-1.5 px-1 py-0.2 bg-indigo-200 text-indigo-800 text-[9px] font-bold rounded shrink-0">1位</span>' : ''}
+                  ${isExisting ? '<span class="ml-1.5 px-1 py-0.2 border border-red-300 text-red-600 text-[9px] font-bold rounded shrink-0">既存</span>' : ''}
+                </div>
+                <span class="text-[9px] text-gray-400 ml-4.5 mt-0.5 truncate">${mDef.type}</span>
+              </div>
+            </div>
+          </td>
+          <td class="px-2 py-2.5 text-right font-medium text-gray-700">
+            ${res.mape.toFixed(2)}%
+          </td>
+          <td class="px-2 py-2.5 text-right font-medium text-gray-700">
+            ${res.mase.toFixed(3)}
+          </td>
+          <td class="px-3 py-2.5 text-right font-bold ${isBest ? 'text-indigo-700 bg-indigo-50/40' : 'text-gray-900'}">
+            ${res.owa.toFixed(3)}
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+  </script>
+</body>
+</html>

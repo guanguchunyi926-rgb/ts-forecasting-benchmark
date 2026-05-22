@@ -1,0 +1,71 @@
+{
+  "categories": {
+    "statistical": "📈 統計時系列モデル (Classical Statistical)",
+    "ml": "🤖 機械学習・ラグ回帰 & 深層学習 (ML/DL Regressors)",
+    "ensemble": "🧬 ハイブリッド・アンサンブルモデル"
+  },
+  "subcategories": {
+    "naive": "ナイーブ",
+    "smoothing": "指数平滑",
+    "arima_grp": "ARIMA",
+    "state_space": "状態空間モデル",
+    "linear_reg": "線形回帰",
+    "tree": "決定木",
+    "svm_grp": "SVM",
+    "nn": "ニューラルネットワーク"
+  },
+  "subcat_groups": {
+    "naive": ["naive2", "naive1", "naive_s"],
+    "smoothing": ["ses", "holt", "damped", "theta", "ets", "tbats"],
+    "arima_grp": ["arma", "arima", "sarima", "autoarima"],
+    "state_space": ["prophet"],
+    "linear_reg": ["linear", "ridge", "lasso", "elasticnet", "gam"],
+    "tree": ["dt", "rf", "gbdt", "xgb", "lgbm"],
+    "svm_grp": ["svm"],
+    "nn": ["mlp", "rnn", "deepar"]
+  },
+  "models": [
+    { "id": "naive2", "name": "Naive 2 (ベースライン)", "category": "statistical", "subcat": "naive", "color": "#4B5563", "paperOwa": 1.000, "isM4": true, "desc": "Naive 1と同様であるが、必要に応じて乗法分解で季節調整。" },
+    { "id": "naive1", "name": "Naive 1", "category": "statistical", "subcat": "naive", "color": "#6B7280", "paperOwa": 1.000, "isM4": true, "desc": "将来の値が最後に知られた観測値と同じになると仮定。" },
+    { "id": "naive_s", "name": "Naive S", "category": "statistical", "subcat": "naive", "color": "#9CA3AF", "paperOwa": 1.000, "isM4": true, "desc": "同じ期間の最後の観測値と同じになると仮定。" },
+    { "id": "ses", "name": "SES (単純指数平滑)", "category": "statistical", "subcat": "smoothing", "color": "#0369A1", "paperOwa": 0.954, "isM4": true, "desc": "データを指数平滑、季節調整、トレンドなしと仮定して外挿。" },
+    { "id": "holt", "name": "Holt (線形トレンド)", "category": "statistical", "subcat": "smoothing", "color": "#0891B2", "paperOwa": 0.954, "isM4": true, "desc": "データを指数平滑、季節調整、線形トレンドを仮定して外挿。" },
+    { "id": "damped", "name": "Damped (減衰トレンド)", "category": "statistical", "subcat": "smoothing", "color": "#0D9488", "paperOwa": 0.954, "isM4": true, "desc": "データを指数平滑、季節調整、減衰トレンドを仮定して外挿。" },
+    { "id": "theta", "name": "Theta法", "category": "statistical", "subcat": "smoothing", "color": "#059669", "paperOwa": 0.954, "isM4": true, "desc": "ドリフトを伴う単純指数平滑化。" },
+    { "id": "ets", "name": "AutoETS", "category": "statistical", "subcat": "smoothing", "color": "#0EA5E9", "paperOwa": 0.929, "isM4": true, "desc": "AICなどで指数平滑化での最適なパラメータを自動探索。" },
+    { "id": "tbats", "name": "TBATS", "category": "statistical", "subcat": "smoothing", "color": "#3B82F6", "paperOwa": 0.928, "isM4": false, "desc": "Box-Cox 変換による指数平滑化状態空間。" },
+    { "id": "arma", "name": "ARMA", "category": "statistical", "subcat": "arima_grp", "color": "#1E3A8A", "paperOwa": 1.207, "isM4": false, "desc": "自己回帰移動平均。" },
+    { "id": "arima", "name": "ARIMA", "category": "statistical", "subcat": "arima_grp", "color": "#1D4ED8", "paperOwa": 0.993, "isM4": false, "desc": "標準的なハイパーパラメータ(1,1,1)を適用した自己回帰和分移動平均（季節調整なし）。" },
+    { "id": "sarima", "name": "SARIMA", "category": "statistical", "subcat": "arima_grp", "color": "#2563EB", "paperOwa": 0.965, "isM4": false, "desc": "明示的な季節周期をモデル化した季節自己回帰和分移動平均。" },
+    { "id": "autoarima", "name": "AutoARIMA", "category": "statistical", "subcat": "arima_grp", "color": "#3B82F6", "paperOwa": 0.948, "isM4": true, "desc": "パラメータ探索ではARIMAだけではなく SARIMAも自動推定。" },
+    { "id": "prophet", "name": "Prophet", "category": "statistical", "subcat": "state_space", "color": "#06B6D4", "paperOwa": 0.940, "isM4": false, "desc": "Facebook開発、トレンド・季節周期・イベント効果を考慮する状態空間モデル。" },
+    { "id": "linear", "name": "Linear", "category": "ml", "subcat": "linear_reg", "color": "#34D399", "paperOwa": 1.060, "isM4": false, "desc": "多変量の線形回帰。過去のラグ特徴量に対するフィッティング。" },
+    { "id": "ridge", "name": "Ridge", "category": "ml", "subcat": "linear_reg", "color": "#10B981", "paperOwa": 1.404, "isM4": false, "desc": "L2正則化項を付与した多変量の線形回帰。" },
+    { "id": "lasso", "name": "Lasso", "category": "ml", "subcat": "linear_reg", "color": "#059669", "paperOwa": 1.350, "isM4": false, "desc": "L1正則化項を付与した多変量の線形回帰。" },
+    { "id": "elasticnet", "name": "Elastic-Net", "category": "ml", "subcat": "linear_reg", "color": "#047857", "paperOwa": 1.317, "isM4": false, "desc": "L1とL2の正則化を付与した多変量の線形回帰。" },
+    { "id": "gam", "name": "GAM", "category": "ml", "subcat": "linear_reg", "color": "#6EE7B7", "paperOwa": 1.092, "isM4": false, "desc": "非線形の関係を表現できるようにした一般化加法モデル。" },
+    { "id": "dt", "name": "Decision Tree", "category": "ml", "subcat": "tree", "color": "#84CC16", "paperOwa": 1.230, "isM4": false, "desc": "データから決定木を作成。" },
+    { "id": "rf", "name": "Random Forest", "category": "ml", "subcat": "tree", "color": "#15803D", "paperOwa": 0.955, "isM4": false, "desc": "弱学習器 of 決定木を並列で複数作成したアンサンブル。" },
+    { "id": "gbdt", "name": "GBDT", "category": "ml", "subcat": "tree", "color": "#F59E0B", "paperOwa": 1.025, "isM4": false, "desc": "弱学習器の決定木を逐次的に複数作成した勾配ブースティング。" },
+    { "id": "xgb", "name": "XGBoost", "category": "ml", "subcat": "tree", "color": "#D97706", "paperOwa": 1.075, "isM4": false, "desc": "GBDTの一種、最適化された分散型勾配ブースティング。" },
+    { "id": "lgbm", "name": "LightGBM", "category": "ml", "subcat": "tree", "color": "#EF4444", "paperOwa": 1.233, "isM4": false, "desc": "XGBoost を改良、計算量を減らし学習速度を向上した勾配ブースティング。" },
+    { "id": "svm", "name": "Support Vector Machine", "category": "ml", "subcat": "svm_grp", "color": "#EA580C", "paperOwa": 1.219, "isM4": false, "desc": "パーセプトロンを拡張、マージン最大化とカーネル関数を適用。" },
+    { "id": "mlp", "name": "MLP (ニューラルネット)", "category": "ml", "subcat": "nn", "color": "#B91C1C", "paperOwa": 1.614, "isM4": true, "desc": "3層以上の順伝播型ニューラルネットワーク。" },
+    { "id": "rnn", "name": "RNN", "category": "ml", "subcat": "nn", "color": "#DC2626", "paperOwa": 1.506, "isM4": true, "desc": "時系列データを順次処理できるようにした再帰型ニューラルネットワーク(LSTM/RNN)。" },
+    { "id": "deepar", "name": "DeepAR", "category": "ml", "subcat": "nn", "color": "#991B1B", "paperOwa": 1.380, "isM4": false, "desc": "自律サンプリングにより、確率的な複数先予測軌道を構築する自己回帰深層モデル。" },
+    { "id": "comb1", "name": "Comb 1", "category": "ensemble", "color": "#A78BFA", "paperOwa": 0.925, "isM4": true, "desc": "SES, Holt, Dampedの3つの指数平滑の組合せ（予測値の平均）。" },
+    { "id": "comb2", "name": "Comb 2", "category": "ensemble", "color": "#7C3AED", "paperOwa": 0.881, "isM4": false, "desc": "3つの精度の高い手法の組合せ（論文の動的選択ルール）。" },
+    { "id": "comb3", "name": "Comb 3", "category": "ensemble", "color": "#8B5CF6", "paperOwa": 0.864, "isM4": false, "desc": "異なる中分類グループで精度の高い3つの手法の組合せ（論文の動的選択ルール）。" },
+    { "id": "comb4", "name": "Comb 4", "category": "ensemble", "color": "#6366F1", "paperOwa": 0.878, "isM4": false, "desc": "2つの精度の高い統計モデルの組み合わせ（論文の動的選択ルール）。" },
+    { "id": "comb5", "name": "Comb 5", "category": "ensemble", "color": "#4F46E5", "paperOwa": 0.981, "isM4": false, "desc": "2つの精度の高い機械学習モデルの組み合わせ（論文の動的選択ルール）。" },
+    { "id": "comb6", "name": "Comb 6", "category": "ensemble", "color": "#3730A3", "paperOwa": 0.886, "isM4": false, "desc": "2つの精度の高い統計モデルと1つの機械学習モデルの組合せ（論文の動的選択ルール）。" }
+  ],
+  "ensemble_rules": {
+    "comb1": { "type": "fixed", "members": ["ses", "holt", "damped"] },
+    "comb2": { "type": "top_n", "source": "all", "n": 3 },
+    "comb3": { "type": "top_subcats", "n_subcats": 3 },
+    "comb4": { "type": "top_n", "source": "statistical", "n": 2 },
+    "comb5": { "type": "top_n", "source": "ml", "n": 2 },
+    "comb6": { "type": "top_n_multi", "sources": [{"source": "statistical", "n": 2}, {"source": "ml", "n": 1}] }
+  }
+}
