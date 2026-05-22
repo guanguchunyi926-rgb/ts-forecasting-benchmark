@@ -1,4 +1,4 @@
-# **複数系列対応 予測ベンチマークシステム (Time Series Forecasting Benchmarking System)**
+# **時系列予測手法選定のための実験フレームワークと精度比較実験 (TExperimental Framework for Selecting Time Series Forecasting Methods and Accuracy Comparison Experiments)**
 
 本システムは、学術論文「時系列予測手法選定のための実験フレームワークと精度比較実験」に基づいて設計された、包括的な予測モデル評価プラットフォームです。
 
