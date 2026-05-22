@@ -30,7 +30,7 @@ ts-forecasting-benchmark/
 | **models\_config.json** | 設定 | 手法選定チェックボックスの項目、中分類、グラフ線カラー、論文OWA値、説明文を完全に一括管理するマスター設定ファイル。 Comb 1〜6のブレンド生成ルール（抽出戦略）もここに外部定義。 |
 | **manual.json** | 設定 | 画面右上のボタンから閲覧できるヘルプ用ユーザーマニュアルの構造化テキストファイル。機能が追加されてもプログラムを修正せずマニュアルを改訂可能。 |
 | **preprocessing.py** | データ前処理 | 時系列データに不可欠な、前方/後方/平均による欠損値補完（Imputation）や、機械学習の適合精度を最大化するZ-Score標準化スケーラー（fit/transform/inverse\_transform）の実装。 |
-| **feature\_engineering.py** | 特徴量作成 | 1次元時系列データ配列から、過去 of ラグ（Sliding Window幅）を自動算出して教師あり学習用の特徴量行列 ![][image1] とターゲット配列 ![][image2] を生成する。 |
+| **feature\_engineering.py** | 特徴量作成 | 1次元時系列データ配列から、過去 of ラグ（Sliding Window幅）を自動算出して教師あり学習用の特徴量行列Xとターゲット配列yを生成する。 |
 | **evaluation\_metrics.py** | 評価指標選択 | 評価誤差の計算を行います。M4競争基準である **SMAPE**（対称平均絶対パーセント誤差）および **MASE**（平均絶対スケーリング誤差）、MASE計算用の学習データベースライン分母（sp対応）の数理計算。 |
 | **ranking\_system.py** | ランキング | 各個別系列で計算されたSMAPEとMASEを集約し、ベースラインモデル（Naive 2）の相対性能比としての **OWA（総合加重平均スコア）** を全モデル分算出してランキング。 |
 | **statistical\_models.py** | 予測手法選択（統計モデル） | 伝統的な時系列モデルの実学習および予測。sktime や prophet と連携。未インストール時は自前のモックシミュレータに安全フォールバック。 |
@@ -170,9 +170,9 @@ python test\_driver.py custom\_input.json
    * AutoETS: AIC等の基準を元に、最適な状態空間（エラー・トレンド・季節性）パラメータを自動探索。  
    * TBATS: Box-Cox変換や複雑な複数季節周期に対応した指数平滑状態空間モデル。  
 3. **ARIMA (Autoregressive Integrated Moving Average)**  
-   * ARMA: 差分階数 ![][image3] の自己回帰移動平均モデル。  
-   * ARIMA: 標準的なパラメータ ![][image4] に固定した季節調整なしのARIMA。  
-   * SARIMA: データの季節周期（![][image5]）を明示的に組み込んだ季節自己回帰和分移動平均モデル。  
+   * ARMA: 差分階数d=0の自己回帰移動平均モデル。  
+   * ARIMA: 標準的なパラメータ（p,d,q=1,1,1）に固定した季節調整なしのARIMA。  
+   * SARIMA: データの季節周期（sp）を明示的に組み込んだ季節自己回帰和分移動平均モデル。  
    * AutoARIMA: ステップワイズ法でARIMAおよびSARIMAの最適な次数を情報量基準を元に自動探索。  
 4. **Prophet (Prophet)**  
    * Prophet: トレンド、複数の周期（年・週）、および祝日効果などを頑健に加法分離するモデル。
@@ -223,13 +223,3 @@ python test\_driver.py custom\_input.json
    * 機械学習・DL系のラグ回帰モデルであれば machine\_learning\_models.py 内の predict\_ml\_model 内の elif model\_id \== 'xxx' に回帰モデル（Regressor）を初期化するロジックを1行追記。
 
 APIやフロントエンド（HTML/JS版、Streamlit版双方）は、FastAPIから起動時に配信される構成設定情報（/api/config）およびアンサンブル推論処理（/api/evaluate）を自動的に読み込んでアコーディオンやチェックボックス、OWAランキング結果などのUIを全自動・ノンコーディングで動的更新するため、フロントエンドの書き換えや再ビルドは一切不要です。
-
-[image1]: <data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAYCAYAAADzoH0MAAABJklEQVR4XmNgGAWDDMjJyWnJy8vfAeL/SPibrKysLUgeyJ6MJncf3QwwAEpYAvFPIL4NxJIwcRUVFXYgfz3QonpxcXFuZD0oQEZGhhOoaAdQ8T8FBQUPqDAjkF8KwiA2snqsAKgxAurM5cbGxqxQzd0gNrparEBRUVEcqOE6EL8H4mYgnky0ZhgAamoFuQLomkNKSkr86PIEATUM8ALif0B8gmQDgJo0gXgf0PZbIEOQYoMwAAagPFDDRmB0qiDHBlCKBV0tBgA5Fah4FdAQMxAfOTaAKVIHXT0KgGpeB8TeyOJAVzRAA7MBWRwFABUogpwNxIXocsBUaQOU/w2UOyUtLS2MLhkLlPwF9ScI/wUq9IfJA/lZIDFkeaCencDwEUI2ZyQDAPVkWUGOojRDAAAAAElFTkSuQmCC>
-
-[image2]: <data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAWCAYAAAD5Jg1dAAABEUlEQVR4XmNgGAWDGzDLyckZKyoq2hkbG7MiSygpKfGDxYAKXOXl5WtUVFT4gPQBBQWFlSCNIEVAfjQQf5OVlTVlAEpkAk3SBwpYggSB/AiYaUD+JCC+KiUlJQK3AqigASj4BIgVQXygTYJA9mkgXgrkMoIViYqK8oCsBeI1QC4LSAxqyyegAelw04ACkkD8EGhKOZIYyH2/gWI2cIVA3eJAwbswhSCfAvl7MNwHBIxAwWKoG+dC3fYfqHE+SA6uCugODhAGuRVqOigEQO6DhwCDtLS0DFDwOsgqcXFxbqAQC9Ck6UD+FWVlZTG4QqjvXgJxDlRRPtCkW0BsAFcEAqDogbrvOAgDFXSCYglFERAAADEZP/QwjoKmAAAAAElFTkSuQmCC>
-
-[image3]: <data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAaCAYAAADxNd/XAAACJUlEQVR4Xu2WPUhbURTHDbHQUkFamgbzktx8QItgIRAcBBEEFwelaifbwUmXLp1KW5yCCIUuXQTBwalLVkFR0FFwUfADnIoITm52qB30d+q9+npKPhxeIvL+8Ofde8655+ve3JuWlhAhQtxvxGKxtnw+/5xhVOvuNIwx/fA3vIBr8Xj8sbYJEslk8hFxx+E8/JrNZl9qm5rwPC/J4mM4o3VBIpfLtRNzFZbkBGQymQLjfTimbasinU73yi6kUqlhrQsSxP1I3C2+T5yM+Vt4wE7E/bZVYR2dwk6tCwqStCRP1xf9cprYjfysVjOjkixOhqRSxmW4IduoDYOCxJem6QLIqYj8l6l0nO3CbQxn4aSM4Tn8rm2DhEu0UgFa/hd026A4hJ+YRkTGeIIFF7W2DJtpnB/dgsvcME+1Hwf0QxJXJ1qtgFYUP8zVbZN1wnQTzr+AeIO3KkAStImWmbZasRTV8PMvqJRoJbl/y6acjC32kP00dZx/KRC7jnpZ61Unnxx2JzpRVwD87JdfFwAHfTK5///AUdiDsw/+NX5Q7Cvs39RLiSOvrPbjYBuyAZeI+9DJWTuA7Fy+fnu5X7tQnLofq30F16RaW/WX/xYFDOK9g0fm5jcZYVyCm5LfP8ZW+R7uwAVz9YSPwF2crPD9ViwWH+hFQULiEXuO2Ovswmub/B7jgra9hv7XKU4SicQzN28CInT7hRw7rvm+RjcxRIgQIerDJYKprGhwbgmNAAAAAElFTkSuQmCC>
-
-[image4]: <data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAHwAAAAaCAYAAAB1szj5AAAE80lEQVR4Xu2aW4gcRRSGe9kIioqOui57m5qZDSzxgsqoKKxGIcruwyqGoIG8CAF9UATvaJDowyLCKl7AB0GjDxJh46PiZcGAQYN5ScSgiIJKoogkQiDiBbJ+f7pKa8uZnu7ZtmcI/cNPV9ep/ru6TtWp0z0TRSVKlChRokSJUwZDQ0Nn1Wq108P6Er1Hs9k8rdFonBPWdw0cfXm1Wt2Rp6gm0OTk5IUUB0NbiWyQw/HR88aYjaEtM8bGxsYR+giHXxzaugFaN8I/4DJcGh4ePjNs00cY5LlvZzBroSEj/ncd/HQ+4/luvV6/OrRlwYBmDnwyNKwGdhIdgvOhrdcYHx8/g0Gd45lfoH+H4XHOm2G7TuiFDm1m4AeKnqEtFSYmJi7hBl/pGNpWAzo8rVWO7i2hrdfQANO3WQbuBvq5PWmAk9ALHW252D+h7ebQlgoIP4rAO7WckzWrewSuC239BNvPtgOcFkXqYJ+HuyiuCW2JkJPlbPh4aIvivWTa3lhJl86b7B83t9mTB+Vc2szRZlgdgrvD0KPkg1V/JW2uV1laCv9+myKRZoDToEgd7LPw+8zjxkUjulBOamHbqn2d4z7sr8uBHO/juA0ewGHGa7sO7sf+NLxLZfgnfNHXRG89/Jz6By33wG/gFr9dkUgzwGlQpI5stDnEwrkqtCXCXvgzx2m/fnR09ALqX7MrVeH+a/aZtbJNTU2dTd3HzplyvOzwMU4HVEf5TuzL/v6tzFL3wnaHrVKy+Eynh8P+BPYfMvA9+npeqNMO1RQDnAZF6piEhZoIidpBWiHOgF2K4D0cxzh+55xrr6lwvg8uVSoVJRA7TZyN1702K/ZvhXXKu+Fe7z1/gHY7qDuoCeauLRppBjgNitQx1uEma2Rs53CHaotMW060znwT+0W27CcQa3RuvP2bdhs4P2G8VzQ3ceT0yEaGXiDNAKdBkTrmX4c/ENoS0cnhEoQ/YW94dVvgMuH4burnXNnZ20QFPcQJOd6r03Zy3L+2FWx00AOmYtYve2kGOA2K1LHP2lVIb3Dhj3A2tEUtVqqtUwj/Uhmic7h/fTWOCn/BjfBaHHq/fYhj7OOXuXYmnjiJDyZoe6HNprRUX/ReG+q0g+1bu34MagLpbSY0hChI5ySqyX5rD5ucHWy1yryV+s++S2i/jvNf5Ex7ro82R1zItx8FllyHOW7juAH9GcpH3UO4RE/37uX+LdgB/q1Vxkv9VhNP6J1Rh3feInQcZKPNt6aLbxwucVrx+iRU7f5t4oxcCdci3I+j1nvNBqi7Fx6Ar8IP4W3wC65/n+OzetcWKS/APVz/BsdP4a+6tzQ8vUKgd3/u/RZ9OGpiRzhq1Tzn2lXjCPa7iQd3xNcQitZxMHF0/M83jlTAAZvhZ9yw4tfbmXYy05awPtxHbZwT/iomB9uVu2Iv5T7n2h8AroDHWkWWfoPCMH19Sa+ooS0L8tKJ7LZa6/a3D+sArbwZr7rV/p0b7AxNDFv9AvpZhwtRh1DcCXnp6HsIOnvdd5GuoD0YkUUlO1qd2mtNHE4Ws2a9SdAst7+ivQ0PK4lTXdiuj6DPxQuMx02hISPy0tHHqqfQeUTl0JgF2osftlS4fcUR8e15rXI9sK8NXzZdJB5Fgb6NMMC3Rqsc3Lx0bNK8K5c/qdjE6iE6dk1oK9F72Lem+VycXaJEiVMMfwMveNwiPkKrIgAAAABJRU5ErkJggg==>
-
-[image5]: <data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAaCAYAAAC3g3x9AAABs0lEQVR4Xu2SwSsEcRTHd7OKSMQadnZ2jJ3LHpSaOIkL4iLJQSkpxZkDRUlJ+QekNiUnB7tHJw5cRC4O68LFQZy0Z0nr83Z/vzW2PVhX++rb7/e+7/vem/nOBALVqEY1Ko9gVyEmHccZ9DyvVhdc122ybXs8Ho9bkhuG0YBmNBaLeaQ1WlcMaaZhDxwjmgab3NPRaLReoGrr4IWFu5wpMKvOpH95PhCNUbhiUAtpSAaD+0gk0gY3zH0DJMAbOJAl0mdZVh95VjQ/BkKsUXjnXDRNs5WGHoFaNs/r9dM8gebT38x9AO4DrHxPKxRGRAxyCmf4FvZr4HbAE4tMzbFsSemn/Np8IHQZvEoxo0TFrfIRyM9BijSkaLFGPBQbEnqIGJ5m0wNfsF048RHuVrarRuG64V7FGs2RO+AZbj+gl+CNAfkIeaiNZlAv3J08sW5W/uWobSkqSL4NMsywtS5fQLQsTwSS3I8YfsM55BfZBf+y4BqcoLnkTKHr8OuKQaEOQSdnc2ktHA43UrsAp/IW8hcIV6r7dZTz788hTyL/pvjHOVfuDSoKBi2ItxoMnCnV/PP4Au9EccPP11bpAAAAAElFTkSuQmCC>
