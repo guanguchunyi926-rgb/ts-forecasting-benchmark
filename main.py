@@ -178,8 +178,13 @@ async def evaluate_models(request: EvaluationRequest):
         if request.settings and "freq" in request.settings:
             freq = request.settings["freq"]
             
-        sp_map = {'M': 12, 'W': 52, 'D': 7, 'Q': 4, 'Y': 1}
+        # sp_map = {'M': 12, 'W': 52, 'D': 7, 'Q': 4, 'Y': 1}
+        freq_alias_map = {"M": "ME", "Q": "QE", "Y": "YE"}
+        freq = freq_alias_map.get(freq, freq)
+        sp_map = {"ME": 12, "W": 52, "D": 7, "QE": 4, "YE": 1}
+
         sp = sp_map.get(freq, 1)
+        print(freq)
         
         # 1. 前処理
         train_data_series = []

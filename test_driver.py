@@ -32,7 +32,8 @@ def run_evaluation(config: Dict[str, Any]) -> Dict[str, Any]:
     
     print(f"[*] APIサーバーへ接続中... URL: {api_url}")
     try:
-        response = requests.post(api_url, json=payload, timeout=60)
+        # response = requests.post(api_url, json=payload, timeout=60)
+        response = requests.post(api_url, json=payload)
         if response.status_code != 200:
             print(f"[-] エラー: APIサーバーが異常応答を返しました (HTTP {response.status_code})")
             print(f"[-] 詳細: {response.text}")

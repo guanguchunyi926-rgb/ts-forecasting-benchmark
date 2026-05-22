@@ -2,6 +2,23 @@ from typing import List, Optional
 import numpy as np
 import pandas as pd
 
+# 警告を非表示
+import warnings
+try:
+    from statsmodels.tools.sm_exceptions import ConvergenceWarning
+    warnings.filterwarnings("ignore", category=ConvergenceWarning)
+    warnings.filterwarnings(
+        "ignore",
+        message="Non-stationary starting autoregressive parameters found.*"
+    )
+    warnings.filterwarnings(
+        "ignore",
+        message="Non-invertible starting MA parameters found.*"
+    )
+except Exception:
+    pass
+
+
 # sktimeおよびProphetライブラリのインポート（環境にない場合の安全策を含む）
 try:
     from sktime.forecasting.naive import NaiveForecaster
@@ -209,9 +226,21 @@ def predict_statistical_model(
         elif model_id == 'prophet':
             if HAS_PROPHET and len(y_train) >= 10:
                 # 日時インデックスを擬似的に作成しProphetへ適合させる
-                freq_map = {'M': 'M', 'W': 'W', 'D': 'D', 'Q': 'Q', 'Y': 'A'}
-                p_freq = freq_map.get(freq_map.get(str(sp), 'M'), 'M')
-                
+                # freq_map = {'M': 'M', 'W': 'W', 'D': 'D', 'Q': 'Q', 'Y': 'A'}
+                # p_freq = freq_map.get(freq_map.get(str(sp), 'M'), 'M')
+
+                # spからProphet/pandas用の頻度を推定する
+                if sp == 12:
+                    p_freq = "ME"   # 月次・月末
+                elif sp == 52:
+                    p_freq = "W"    # 週次
+                elif sp == 7:
+                    p_freq = "D"    # 日次
+                elif sp == 4:
+                    p_freq = "QE"   # 四半期
+                else:
+                    p_freq = "D"    # 不明な場合は日次扱い
+
                 start_date = "2020-01-01"
                 dates = pd.date_range(start=start_date, periods=len(y_train), freq=p_freq)
                 df_prophet = pd.DataFrame({"ds": dates, "y": y_train.values})

@@ -112,8 +112,14 @@ def predict_ml_model(
         window_length = min(12, max(3, len(clean_train) // 4))
         
         # 4. ラグデータ構造 [X, y] の生成
+        # X, y = create_lag_features(scaled_train, window_length)
         X, y = create_lag_features(scaled_train, window_length)
-        
+
+        # LightGBM / sklearn の feature names Warning 回避のため、
+        # 学習・予測ともに numpy 配列へ統一する
+        X = np.asarray(X)
+        y = np.asarray(y)
+
         # 5. 各回帰モデル・AIアーキテクチャの定義と学習
         # --- scikit-learn & 線形 & 決定木 & MLP ---
         if model_id == 'linear':
@@ -156,7 +162,11 @@ def predict_ml_model(
                 regressor = lgb.LGBMRegressor(n_estimators=80, max_depth=3, random_state=42, verbose=-1)
             else:
                 regressor = GradientBoostingRegressor(n_estimators=80, max_depth=3, random_state=42)
-            regressor.fit(X, y)
+            # regressor.fit(X, y)
+            regressor.fit(np.asarray(X), np.asarray(y))
+            print("DEBUG model_id:", model_id)
+            print("DEBUG X type:", type(X))
+            print("DEBUG has feature_names_in_:", hasattr(regressor, "feature_names_in_"))
             
         # --- GAM (一般化加法モデル) ---
         elif model_id == 'gam':
@@ -225,14 +235,24 @@ def predict_ml_model(
                 
                 current_window = list(scaled_train[-window_length:])
                 scaled_predictions = []
+                # for _ in range(horizon):
+                #     pred_scaled = float(mlp_fallback.predict([current_window])[0])
+                #     if model_id == 'deepar':
+                #         pred_scaled += np.random.normal(0, 0.05)
+                #     scaled_predictions.append(pred_scaled)
+                #     current_window.pop(0)
+                #     current_window.append(pred_scaled)
                 for _ in range(horizon):
-                    pred_scaled = float(mlp_fallback.predict([current_window])[0])
+                    X_pred = np.asarray([current_window])
+                    pred_scaled = float(mlp_fallback.predict(X_pred)[0])
+
                     if model_id == 'deepar':
                         pred_scaled += np.random.normal(0, 0.05)
+
                     scaled_predictions.append(pred_scaled)
                     current_window.pop(0)
                     current_window.append(pred_scaled)
-                
+
                 final_predictions = scaler.inverse_transform(scaled_predictions)
                 return [float(x) for x in final_predictions]
                 
@@ -243,8 +263,21 @@ def predict_ml_model(
         current_window = list(scaled_train[-window_length:])
         scaled_predictions = []
         
+        # for _ in range(horizon):
+        #     pred_scaled = float(regressor.predict([current_window])[0])
+        #     scaled_predictions.append(pred_scaled)
+        #     current_window.pop(0)
+        #     current_window.append(pred_scaled)
+        feature_names = getattr(regressor, "feature_names_in_", None)
+
         for _ in range(horizon):
-            pred_scaled = float(regressor.predict([current_window])[0])
+            if feature_names is not None:
+                X_pred = pd.DataFrame([current_window], columns=feature_names)
+            else:
+                X_pred = np.asarray([current_window])
+
+            pred_scaled = float(regressor.predict(X_pred)[0])
+
             scaled_predictions.append(pred_scaled)
             current_window.pop(0)
             current_window.append(pred_scaled)
