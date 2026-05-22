@@ -9,19 +9,19 @@
 システムは、クリーンアーキテクチャおよびカプセル化（疎結合）の思想に基づき、各役割ごとにモジュールが細分化されています。
 
 ts-forecasting-benchmark/  
-├── models_config.json      \# 全34予測手法の定義、カラーコード、Combブレンド規則の設定ファイル  
-├── manual.json             \# 画面上で閲覧できる、全機能を網羅した日本語ユーザーマニュアル  
-├── preprocessing.py        \# データ前処理（欠損値穴埋め・Z-Score標準化スケーラー）  
-├── feature_engineering.py  \# 教師あり学習用ラグ特徴量（Sliding Window）生成  
-├── evaluation_metrics.py   \# SMAPE、MASE、MASE分母基準の数理計算  
-├── ranking_system.py       \# OWA (Overall Weighted Average) の集計・ソート・ランキングシステム  
-├── statistical_models.py   \# 統計予測アルゴリズムの処理（ProphetやARIMA系を含む14種）  
-├── machine_learning_models.py \# 機械学習・深層学習の予測処理および自己再帰推論ループ（14種）  
-├── main.py                 \# FastAPI Web APIサーバー（コントローラー、CORS設定、動的Comb計算）  
-├── test_driver.py          \# APIサーバー検証用自動テストドライバースクリプト  
-├── test_input_template.json \# テストドライバー用入力パラメータ定義JSONファイル  
-├── benchmark_app.html      \# HTML/JS フロントエンド（Chart.jsズーム、クリック値ロック、目玉トグル搭載）  
-└── streamlit_app.py        \# Streamlit (Python) フロントエンド（Plotly描画、動的構成同期対応）
+├── models_config.json           \# 全34予測手法の定義、カラーコード、Combブレンド規則の設定ファイル  
+├── manual.json                  \# 画面上で閲覧できる、全機能を網羅した日本語ユーザーマニュアル  
+├── preprocessing.py             \# データ前処理（欠損値穴埋め・Z-Score標準化スケーラー）  
+├── feature_engineering.py       \# 教師あり学習用ラグ特徴量（Sliding Window）生成  
+├── evaluation_metrics.py        \# SMAPE、MASE、MASE分母基準の数理計算  
+├── ranking_system.py            \# OWA (Overall Weighted Average) の集計・ソート・ランキングシステム  
+├── statistical_models.py        \# 統計予測アルゴリズムの処理（ProphetやARIMA系を含む14種）  
+├── machine_learning_models.py   \# 機械学習・深層学習の予測処理および自己再帰推論ループ（14種）  
+├── main.py                      \# FastAPI Web APIサーバー（コントローラー、CORS設定、動的Comb計算）  
+├── test_driver.py               \# APIサーバー検証用自動テストドライバースクリプト  
+├── test_input_template.json     \# テストドライバー用入力パラメータ定義JSONファイル  
+├── benchmark_app.html           \# HTML/JS フロントエンド（Chart.jsズーム、クリック値ロック、目玉トグル搭載）  
+└── streamlit_app.py             \# Streamlit (Python) フロントエンド（Plotly描画、動的構成同期対応）
 
 ### **各ファイルの役割詳細**
 
