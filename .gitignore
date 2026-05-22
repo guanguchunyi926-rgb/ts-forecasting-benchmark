@@ -1,0 +1,7 @@
+# .gitignore
+.venv/
+venv/
+__pycache__/
+*.pyc
+# Mac特有の隠しファイルを除外（これを追加）
+.DS_Store
