@@ -100,7 +100,7 @@ requirements.txt にリスト化されているライブラリ群は、システ
 
 プロジェクトのルートディレクトリで以下のコマンドを実行し、FastAPIサーバーを起動します。
 
-uvicorn main:app \--host 0.0.0.0 \--port 8000 \--reload
+   uvicorn main:app \--host 0.0.0.0 \--port 8000 \--reload
 
 起動すると、http://localhost:8000/api/config（構成情報の取得）や http://localhost:8000/api/manual（マニュアルの取得）が配信可能になり、API連携準備が整います。
 
