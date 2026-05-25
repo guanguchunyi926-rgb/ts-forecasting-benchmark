@@ -203,8 +203,7 @@ python test\_driver.py custom\_input.json
 
 APIやフロントエンド（HTML/JS版、Streamlit版双方）は、FastAPIから起動時に配信される構成設定情報（/api/config）およびアンサンブル推論処理（/api/evaluate）を自動的に読み込んでアコーディオンやチェックボックス、OWAランキング結果などのUIを全自動・ノンコーディングで動的更新するため、フロントエンドの書き換えや再ビルドは一切不要です。
 
-## **8\. 開発中（フロントエンドの起動・使用方法）**
-#### **A. HTML/JavaScript版 Webアプリ (benchmark\_app.html)**
+## **8\. 開発中（フロントエンドの起動・使用方法）**> このセクションは現在開発中です。記載内容は変更される可能性があります。#### **A. HTML/JavaScript版 Webアプリ (benchmark\_app.html)**
 https://github.com/user-attachments/assets/f73eaba6-5a4b-4b43-9712-c3b6018b6131
 
 1. benchmark\_app.html をブラウザでダブルクリックして開きます。 
