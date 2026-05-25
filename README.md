@@ -107,9 +107,9 @@ uvicorn main:app \--host 0.0.0.0 \--port 8000 \--reload
 ### **STEP 2: フロントエンドの起動・使用方法**
 
 #### **A. HTML/JavaScript版 Webアプリ (benchmark\_app.html)**
+https://github.com/user-attachments/assets/f73eaba6-5a4b-4b43-9712-c3b6018b6131
 
 1. benchmark\_app.html をブラウザでダブルクリックして開きます。 
-https://github.com/user-attachments/assets/f73eaba6-5a4b-4b43-9712-c3b6018b6131
 2. **API未連携時（ローカル模擬）**:  
    * ヘッダーの「API連携」が「ローカル模擬予測」になっていることを確認。  
    * 「ベンチマーク評価を実行」をクリックすると、内蔵された擬似予測ジェネレータが動き、動的Combを含むすべてのOWA性能ランキング、クリックによる値ロックパネルなどが即時に体験できます。  
