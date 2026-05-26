@@ -31,84 +31,104 @@ def load_csv_series(filepath: str):
     if not os.path.exists(filepath):
         return [], None
 
+    def read_csv_with_encodings(path):
+        for enc in ['utf-8', 'cp932', 'shift_jis', 'latin1']:
+            try:
+                with open(path, newline='', encoding=enc) as f:
+                    reader = csv.DictReader(f)
+                    headers = [h.strip() for h in (reader.fieldnames or [])]
+                    rows = list(reader)
+                return headers, rows, enc
+            except Exception:
+                continue
+        raise UnicodeDecodeError('utf-8', b'', 0, 1, 'unable to decode file with common encodings')
+
     try:
-        with open(filepath, newline='') as f:
-            reader = csv.DictReader(f)
-            headers = reader.fieldnames or []
-            has_series_col = '系列名' in headers
-            has_actual_col = '実績' in headers
-            has_pred_col = '予測' in headers
+        headers, rows, used_encoding = read_csv_with_encodings(filepath)
+        has_series_col = any(x in headers for x in ['系列名', '系列', 'series'])
+        has_actual_col = any(x in headers for x in ['実績', 'actual'])
+        has_pred_col = any(x in headers for x in ['予測', 'forecast'])
 
-            # グループ化するためのマップ
-            if has_series_col:
-                groups = OrderedDict()
-                for row in reader:
-                    series_key = row.get('系列名', '').strip()
-                    if series_key == '':
-                        series_key = 'series_0'
-                    if series_key not in groups:
-                        groups[series_key] = {'actual': [], 'pred': []}
+        def find_header(candidates):
+            for c in candidates:
+                if c in headers:
+                    return c
+            return None
 
-                    # 実績の抽出
-                    val = None
-                    if has_actual_col:
-                        try:
-                            val = float(str(row.get('実績', '')).strip())
-                        except Exception:
-                            val = None
-                    else:
-                        # 実績列が無ければ、最後のカラムを数値として試す
-                        try:
-                            last = list(row.values())[-1]
-                            val = float(str(last).strip())
-                        except Exception:
-                            val = None
+        series_key = find_header(['系列名', '系列', 'series'])
+        actual_key = find_header(['実績', 'actual'])
+        pred_key = find_header(['予測', 'forecast'])
 
-                    if val is not None:
-                        groups[series_key]['actual'].append(val)
+        # グループ化するためのマップ
+        if has_series_col and series_key is not None:
+            groups = OrderedDict()
+            for row in rows:
+                raw_key = row.get(series_key, '') if series_key is not None else ''
+                series_value = str(raw_key).strip() if raw_key is not None else ''
+                if series_value == '':
+                    series_value = 'series_0'
+                if series_value not in groups:
+                    groups[series_value] = {'actual': [], 'pred': []}
 
-                    # 予測の抽出（存在すれば）
-                    if has_pred_col:
-                        try:
-                            p = float(str(row.get('予測', '')).strip())
-                        except Exception:
-                            p = None
-                        if p is not None:
-                            groups[series_key]['pred'].append(p)
+                # 実績の抽出
+                val = None
+                if actual_key is not None:
+                    try:
+                        val = float(str(row.get(actual_key, '')).strip())
+                    except Exception:
+                        val = None
+                else:
+                    try:
+                        last = list(row.values())[-1]
+                        val = float(str(last).strip())
+                    except Exception:
+                        val = None
 
-                data_series = [v['actual'] for v in groups.values()]
-                existing = [v['pred'] for v in groups.values()] if has_pred_col else None
-                return data_series, existing
-            else:
-                # 系列指定なし: 単一系列扱い。行ごとに実績(または最後の数値列)を収集
-                data = []
-                preds = [] if has_pred_col else None
-                for row in reader:
-                    if has_actual_col:
-                        try:
-                            a = float(str(row.get('実績', '')).strip())
-                        except Exception:
-                            a = None
-                    else:
-                        try:
-                            # DictReaderのrowはOrderedDict順、最後の値を実績とみなす
-                            a = float(list(row.values())[-1])
-                        except Exception:
-                            a = None
-                    if a is not None:
-                        data.append(a)
+                if val is not None:
+                    groups[series_value]['actual'].append(val)
 
-                    if has_pred_col:
-                        try:
-                            p = float(str(row.get('予測', '')).strip())
-                        except Exception:
-                            p = None
-                        if p is not None:
-                            if preds is None:
-                                preds = []
-                            preds.append(p)
+                # 予測の抽出（存在すれば）
+                if has_pred_col and pred_key is not None:
+                    try:
+                        p = float(str(row.get(pred_key, '')).strip())
+                    except Exception:
+                        p = None
+                    if p is not None:
+                        groups[series_value]['pred'].append(p)
 
-                return [data] if data else [], ( [preds] if preds else None )
+            data_series = [v['actual'] for v in groups.values()]
+            existing = [v['pred'] for v in groups.values()] if has_pred_col else None
+            return data_series, existing
+        else:
+            # 系列指定なし: 単一系列扱い。行ごとに実績(または最後の数値列)を収集
+            data = []
+            preds = [] if has_pred_col else None
+            for row in rows:
+                if has_actual_col and actual_key is not None:
+                    try:
+                        a = float(str(row.get(actual_key, '')).strip())
+                    except Exception:
+                        a = None
+                else:
+                    try:
+                        # DictReaderのrowはOrderedDict順、最後の値を実績とみなす
+                        a = float(list(row.values())[-1])
+                    except Exception:
+                        a = None
+                if a is not None:
+                    data.append(a)
+
+                if has_pred_col and pred_key is not None:
+                    try:
+                        p = float(str(row.get(pred_key, '')).strip())
+                    except Exception:
+                        p = None
+                    if p is not None:
+                        if preds is None:
+                            preds = []
+                        preds.append(p)
+
+            return [data] if data else [], ([preds] if preds else None)
     except Exception as e:
         print(f"[-] CSVの読み込みに失敗しました: {e}")
         return [], None
@@ -251,8 +271,8 @@ def main():
     response = run_evaluation(config)
     
     # エクスポート出力ファイルの決定
-    score_out = "benchmark_scores_output.csv"
-    forecast_out = "forecast_values_output.csv"
+    score_out = "output/benchmark_scores_output.csv"
+    forecast_out = "output/forecast_values_output.csv"
     
     export_results_to_csv(response, score_out, forecast_out)
     print("\n[+] 全てのAPI統合バッチテスト処理が正常に終了しました。")

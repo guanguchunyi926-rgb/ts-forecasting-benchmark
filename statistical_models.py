@@ -23,6 +23,11 @@ try:
         category=FutureWarning,
         message=".*force_all_finite.*"
     )
+    warnings.filterwarnings(
+        "ignore",
+        category=UserWarning,
+        message="resource_tracker: .*"
+    )
 except Exception:
     pass
 
@@ -88,11 +93,11 @@ def get_fallback_forecast(model_id: str, valid_train: List[float], horizon: int,
             damped_preds.append(float(current_val + (np.random.rand() - 0.5) * scale * 0.1))
         return damped_preds
     elif model_id == 'theta':
-        return [float(last_val * 0.7 + recent_mean * 0.3 + slope * (i + 1) * 0.5) for _ in range(horizon)]
+        return [float(last_val * 0.7 + recent_mean * 0.3 + slope * (i + 1) * 0.5) for i in range(horizon)]
     elif model_id == 'ets':
-        return [float(last_val + slope * (i + 1) * 0.8 + np.sin(i * 2 * np.pi / sp) * scale) for _ in range(horizon)]
+        return [float(last_val + slope * (i + 1) * 0.8 + np.sin(i * 2 * np.pi / sp) * scale) for i in range(horizon)]
     elif model_id == 'tbats':
-        return [float(last_val + np.cos(i * 2 * np.pi / sp) * scale * 1.2) for _ in range(horizon)]
+        return [float(last_val + np.cos(i * 2 * np.pi / sp) * scale * 1.2) for i in range(horizon)]
     elif model_id == 'arma':
         arma_preds = []
         avg_val = float(np.mean(valid_train)) if valid_train else 100.0
@@ -304,17 +309,19 @@ def predict_statistical_model(
         elif model_id == 'autoarima':
             effective_sp = sp if (sp > 1 and len(y_train) > 2 * sp) else 1
             if len(y_train) > 20000:
+                logger.warning(
+                    "predict_statistical_model autoarima skipped due to very long train length=%s; using fallback",
+                    len(y_train)
+                )
+                return fallback
+            elif len(y_train) > 10000:
                 max_p, max_q, max_P, max_Q, max_d, max_D, max_order = 2, 2, 1, 1, 1, 1, 4
                 maxiter = 25
                 n_fits = 10
-            elif len(y_train) > 10000:
+            else:
                 max_p, max_q, max_P, max_Q, max_d, max_D, max_order = 3, 3, 1, 1, 1, 1, 5
                 maxiter = 35
                 n_fits = 15
-            else:
-                max_p, max_q, max_P, max_Q, max_d, max_D, max_order = 3, 3, 1, 1, 2, 1, 5
-                maxiter = 50
-                n_fits = 20
 
             logger.info(
                 "predict_statistical_model autoarima params len=%s sp=%s max_p=%s max_q=%s max_P=%s max_Q=%s max_d=%s max_D=%s max_order=%s",
@@ -355,6 +362,8 @@ def predict_statistical_model(
                     p_freq = "W"    # 週次
                 elif sp == 7:
                     p_freq = "D"    # 日次
+                elif sp == 24:
+                    p_freq = "h"    # 時間
                 elif sp == 4:
                     p_freq = "QE"   # 四半期
                 else:
@@ -386,8 +395,8 @@ def predict_statistical_model(
                 try:
                     m = Prophet(
                         yearly_seasonality=True if sp in [12, 52] else 'auto',
-                        weekly_seasonality=True if sp == 7 else 'auto',
-                        daily_seasonality=False
+                        weekly_seasonality=True if sp in [7, 24] else 'auto',
+                        daily_seasonality=True if sp == 24 else False
                     )
                     m.fit(df_prophet)
                     future = m.make_future_dataframe(periods=horizon, freq=p_freq)

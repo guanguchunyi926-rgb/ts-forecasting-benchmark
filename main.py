@@ -185,11 +185,11 @@ async def evaluate_models(request: EvaluationRequest):
 
         freq = "M"
         if request.settings and "freq" in request.settings:
-            freq = request.settings["freq"]
+            freq = str(request.settings["freq"]).strip().upper()
 
-        freq_alias_map = {"M": "ME", "Q": "QE", "Y": "YE"}
+        freq_alias_map = {"M": "ME", "Q": "QE", "Y": "YE", "H": "H"}
         freq = freq_alias_map.get(freq, freq)
-        sp_map = {"ME": 12, "W": 52, "D": 7, "QE": 4, "YE": 1}
+        sp_map = {"ME": 12, "W": 52, "D": 7, "H": 24, "QE": 4, "YE": 1}
 
         sp = sp_map.get(freq, 1)
         logger.info("Step 1/7: settings parsed (freq=%s, sp=%s)", freq, sp)

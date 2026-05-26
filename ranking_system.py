@@ -31,6 +31,14 @@ def rank_models_by_owa(
         
         for m_id in model_ids:
             pred = np.array(all_forecasts[m_id][s], dtype=float)
+            
+            # Handle size mismatch between actual and prediction
+            if len(actual) != len(pred):
+                logger.debug("rank_models_by_owa size mismatch for model=%s series=%s: actual_len=%s pred_len=%s",
+                             m_id, s, len(actual), len(pred))
+                # Truncate prediction to match actual length
+                pred = pred[:len(actual)]
+            
             valid_mask = ~np.isnan(actual) & ~np.isnan(pred)
             if not np.any(valid_mask):
                 smape, mase = 0.0, 1.0

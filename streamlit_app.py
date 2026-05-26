@@ -406,14 +406,42 @@ def render_step1(api_mode, api_url):
         
         if uploaded_file is not None:
             try:
-                df = pd.read_csv(uploaded_file)
-                series_names = df[col_series].unique().tolist()
+                def load_csv_file(file_obj):
+                    try:
+                        return pd.read_csv(file_obj)
+                    except Exception:
+                        file_obj.seek(0)
+                        return pd.read_csv(file_obj, encoding='cp932')
+
+                df = load_csv_file(uploaded_file)
+                cols = [c.strip() for c in df.columns.tolist()]
+                alias_map = {
+                    'series': ['系列', '系列名', 'series'],
+                    'date': ['日付', 'date', 'timestamp', 'datetime'],
+                    'actual': ['実績', 'actual', 'value'],
+                    'forecast': ['予測', 'forecast', 'pred']
+                }
+
+                def choose_col(name, default):
+                    if default in cols:
+                        return default
+                    for alt in alias_map.get(name, []):
+                        if alt in cols:
+                            return alt
+                    return default
+
+                col_series_loaded = choose_col('series', col_series)
+                col_time_loaded = choose_col('date', col_time)
+                col_actual_loaded = choose_col('actual', col_actual)
+                col_forecast_loaded = choose_col('forecast', col_forecast)
+
+                series_names = df[col_series_loaded].unique().tolist()
                 data_series = []
                 existing_series = []
                 for s in series_names:
-                    sdf = df[df[col_series] == s].sort_values(by=col_time)
-                    data_series.append(sdf[col_actual].tolist())
-                    existing_series.append(sdf[col_forecast].tolist())
+                    sdf = df[df[col_series_loaded] == s].sort_values(by=col_time_loaded)
+                    data_series.append(sdf[col_actual_loaded].tolist())
+                    existing_series.append(sdf[col_forecast_loaded].tolist())
                 st.session_state.data_series = data_series
                 st.session_state.existing_rule_series = existing_series
                 st.session_state.series_names = series_names
