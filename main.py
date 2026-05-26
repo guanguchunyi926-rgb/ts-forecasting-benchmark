@@ -256,7 +256,7 @@ async def evaluate_models(request: EvaluationRequest):
                 logger.debug("Series %s statistical model %s forecast generated", s, m_id)
 
             for m_id in ml_models_keys:
-                forecast = predict_ml_model(m_id, train_data, horizon, last_val, naive1_forecast=n1_forecast)
+                forecast = predict_ml_model(m_id, train_data, horizon, last_val, naive1_forecast=n1_forecast, sp=sp)
                 all_forecasts[m_id].append(forecast)
                 logger.debug("Series %s ml model %s forecast generated", s, m_id)
 

@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 # 内部前処理・ラグ設計機能
 from preprocessing import impute_missing_values, StandardScaler1D
-from feature_engineering import create_lag_features
+from feature_engineering import create_lag_features, select_lag_width
 
 # 各種機械学習・ディープラーニングライブラリのロードと検証
 try:
@@ -93,7 +93,8 @@ def predict_ml_model(
     valid_train: List[float], 
     horizon: int, 
     last_val: float, 
-    naive1_forecast: Optional[List[float]] = None
+    naive1_forecast: Optional[List[float]] = None,
+    sp: int = 1
 ) -> List[float]:
     """
     独自の前処理、標準化、スライド式特徴量ラグ生成、および自己再帰的な将来予測ループを
@@ -118,8 +119,8 @@ def predict_ml_model(
         scaled_train = scaler.fit_transform(clean_train)
         
         # 3. 最適なラグ幅の算定 (ラグ特徴量の次元数)
-        window_length = min(12, max(3, len(clean_train) // 4))
-        logger.debug("predict_ml_model: window_length=%s", window_length)
+        window_length = select_lag_width(len(clean_train), sp)
+        logger.debug("predict_ml_model: window_length=%s sp=%s", window_length, sp)
         
         # 4. ラグデータ構造 [X, y] の生成
         X, y = create_lag_features(scaled_train, window_length)
